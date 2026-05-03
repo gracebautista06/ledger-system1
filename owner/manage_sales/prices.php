@@ -67,10 +67,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ── FETCH ALL DISTINCT BREEDS FROM ACTIVE + RETIRED BATCHES ──
-// This ensures any breed with a batch shows up, even if no prices set yet.
+// ── ENSURE hidden_breeds TABLE EXISTS ────────────────────────
+$conn->query("
+    CREATE TABLE IF NOT EXISTS hidden_breeds (
+        breed VARCHAR(120) NOT NULL PRIMARY KEY
+    )
+");
+
+// ── HANDLE HIDE BREED ─────────────────────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['hide_breed'])) {
+    $hide_breed = base64_decode($_POST['hide_breed']);
+    if ($hide_breed) {
+        $hide_esc = $conn->real_escape_string($hide_breed);
+        $conn->query("INSERT IGNORE INTO hidden_breeds (breed) VALUES ('$hide_esc')");
+        $message = "<div class='alert success'>
+            <strong>" . htmlspecialchars($hide_breed) . "</strong> is now hidden from this page.
+            <a href='?show_hidden=1' style='color:inherit;text-decoration:underline;margin-left:8px;'>Undo</a>
+        </div>";
+    }
+}
+
+// ── HANDLE UNHIDE (undo) ──────────────────────────────────────
+if (isset($_GET['show_hidden'])) {
+    $conn->query("DELETE FROM hidden_breeds");
+    header("Location: prices.php"); exit();
+}
+
+// ── FETCH ALL DISTINCT BREEDS (excluding hidden) ──────────────
 $breeds_q = $conn->query("
     SELECT DISTINCT breed FROM batches
+    WHERE breed NOT IN (SELECT breed FROM hidden_breeds)
     ORDER BY breed ASC
 ");
 $breeds = [];
@@ -79,6 +105,10 @@ if ($breeds_q) {
         $breeds[] = $row['breed'];
     }
 }
+
+// ── COUNT HIDDEN BREEDS ───────────────────────────────────────
+$hidden_count_q = $conn->query("SELECT COUNT(*) AS n FROM hidden_breeds");
+$hidden_count   = $hidden_count_q ? (int)$hidden_count_q->fetch_assoc()['n'] : 0;
 
 // ── FETCH EXISTING PRICES (keyed breed → size → row) ─────────
 $prices_q = $conn->query("SELECT * FROM breed_prices ORDER BY breed ASC, FIELD(size_code,'PW','S','M','L','XL','J')");
@@ -106,12 +136,20 @@ $size_meta = [
             <h2> Egg Pricing by Breed</h2>
             <p>
                 Set prices per tray (30 eggs) for each egg size, per breed.
-                New breeds added in Flock Batches appear here automatically.
             </p>
         </div>
     </div>
 
     <?php echo $message; ?>
+
+    <?php if ($hidden_count > 0): ?>
+    <div style="background:var(--bg-wood); border:1px solid var(--border-mid); border-radius:var(--radius-sm);
+                padding:10px 16px; margin-bottom:1.2rem; font-size:0.82rem; color:var(--text-muted);
+                display:flex; justify-content:space-between; align-items:center;">
+        <span><?php echo $hidden_count; ?> breed table<?php echo $hidden_count > 1 ? 's' : ''; ?> hidden from this page.</span>
+        <a href="?show_hidden=1" style="color:var(--gold); font-weight:700; text-decoration:none;">Restore all</a>
+    </div>
+    <?php endif; ?>
 
     <?php if (empty($breeds)): ?>
     <div class="card">
@@ -120,7 +158,7 @@ $size_meta = [
             <p>No breeds found.</p>
             <small>Add a flock batch first in
                 <a href="batches.php" style="color:var(--gold);">Manage Batches</a>.
-                Each breed you add will automatically appear here for pricing.
+               
             </small>
         </div>
     </div>
@@ -135,7 +173,7 @@ $size_meta = [
         ?>
 
         <!-- ── ONE BREED SECTION ─────────────────────────────── -->
-        <div class="price-card <?php echo $is_configured ? 'configured' : 'not-configured'; ?>">
+        <div class="price-card <?php echo $any_set ? 'configured' : 'not-configured'; ?>">
 
             <!-- Breed header -->
             <div style="display:flex; justify-content:space-between; align-items:center;
@@ -152,24 +190,46 @@ $size_meta = [
                         <?php endif; ?>
                     </div>
                 </div>
-                <!-- Reset breed prices button -->
-                <button type="button"
-                        onclick="resetBreed('<?php echo addslashes($breed_b64); ?>')"
-                        title="Reset prices for this breed"
-                        style="background:transparent; border:1px solid var(--danger, #e03131);
-                               color:var(--danger, #e03131); border-radius:6px;
-                               width:32px; height:32px; display:flex; align-items:center;
-                               justify-content:center; cursor:pointer; transition:all 0.15s;
-                               flex-shrink:0;"
-                        onmouseover="this.style.background='var(--danger,#e03131)';this.style.color='#fff';"
-                        onmouseout="this.style.background='transparent';this.style.color='var(--danger,#e03131)';">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
-                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-                        <path d="M3 3v5h5"/>
-                    </svg>
-                </button>
+                <div style="display:flex; gap:6px;">
+                    <!-- Reset breed prices button -->
+                    <button type="button"
+                            onclick="resetBreed('<?php echo addslashes($breed_b64); ?>')"
+                            title="Clear all prices for this breed (does not delete from database)"
+                            style="background:transparent; border:1px solid var(--danger, #e03131);
+                                   color:var(--danger, #e03131); border-radius:6px;
+                                   width:32px; height:32px; display:flex; align-items:center;
+                                   justify-content:center; cursor:pointer; transition:all 0.15s;
+                                   flex-shrink:0;"
+                            onmouseover="this.style.background='var(--danger,#e03131)';this.style.color='#fff';"
+                            onmouseout="this.style.background='transparent';this.style.color='var(--danger,#e03131)';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                        </svg>
+                    </button>
+
+                    <!-- Hide breed card button -->
+                    <button type="button"
+                            onclick="confirmHideBreed('<?php echo addslashes($breed_b64); ?>', '<?php echo addslashes(htmlspecialchars($breed, ENT_QUOTES)); ?>')"
+                            title="Hide this breed's pricing table from the page"
+                            style="background:transparent; border:1px solid var(--border-mid);
+                                   color:var(--text-muted); border-radius:6px;
+                                   width:32px; height:32px; display:flex; align-items:center;
+                                   justify-content:center; cursor:pointer; transition:all 0.15s;
+                                   flex-shrink:0;"
+                            onmouseover="this.style.borderColor='var(--text-muted)';this.style.color='var(--text-primary)';"
+                            onmouseout="this.style.borderColor='var(--border-mid)';this.style.color='var(--text-muted)';">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                             viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <!-- Size rows -->
@@ -240,6 +300,14 @@ $size_meta = [
         <?php endforeach; ?>
     </form>
     <?php endif; ?>
+
+    <!-- Hide forms must live OUTSIDE the main price form (nested forms are invalid HTML) -->
+    <?php foreach ($breeds as $breed):
+        $breed_b64 = base64_encode($breed); ?>
+    <form id="delete-form-<?php echo $breed_b64; ?>" method="POST" style="display:none;">
+        <input type="hidden" name="hide_breed" value="<?php echo htmlspecialchars($breed_b64); ?>">
+    </form>
+    <?php endforeach; ?>
     </div>
     
         <!-- Info note -->
@@ -257,6 +325,11 @@ $size_meta = [
 </div>
 
 <script>
+function confirmHideBreed(breedB64, breedName) {
+    if (!confirm('Hide the "' + breedName + '" pricing table?\n\nYou can restore it anytime from the notice at the top of this page.')) return;
+    document.getElementById('delete-form-' + breedB64).submit();
+}
+
 function resetBreed(breedB64) {
     const sizes = ['PW', 'S', 'M', 'L', 'XL', 'J'];
     sizes.forEach(code => {
