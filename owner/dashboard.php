@@ -134,7 +134,7 @@ $js_rev_data = json_encode($rev_data);
         <div class="stat-sub">registered farm workers</div>
     </div>
 
-    <a href="my_notifications.php" style="text-decoration:none; flex:1; min-width:180px;">
+    <a href="staff_notifications.php" style="text-decoration:none; flex:1; min-width:180px;">
         <div class="stat-card" style="border-top:3px solid var(--warning); cursor:pointer; transition:border-color 0.2s;"
              onmouseover="this.style.borderColor='var(--danger)'"
              onmouseout="this.style.borderColor='var(--warning)'">
@@ -303,6 +303,10 @@ $js_rev_data = json_encode($rev_data);
              Users
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
+            <a href="manage_inventory/data_management.php"
+               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
+               🗄️ Data Management
+            </a>
             <a href="manage_users/users.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
                👥 Farm Staff

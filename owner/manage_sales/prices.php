@@ -152,7 +152,24 @@ $size_meta = [
                         <?php endif; ?>
                     </div>
                 </div>
-                <!-- Copy from another breed button — future enhancement placeholder -->
+                <!-- Reset breed prices button -->
+                <button type="button"
+                        onclick="resetBreed('<?php echo addslashes($breed_b64); ?>')"
+                        title="Reset prices for this breed"
+                        style="background:transparent; border:1px solid var(--danger, #e03131);
+                               color:var(--danger, #e03131); border-radius:6px;
+                               width:32px; height:32px; display:flex; align-items:center;
+                               justify-content:center; cursor:pointer; transition:all 0.15s;
+                               flex-shrink:0;"
+                        onmouseover="this.style.background='var(--danger,#e03131)';this.style.color='#fff';"
+                        onmouseout="this.style.background='transparent';this.style.color='var(--danger,#e03131)';">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15"
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                        <path d="M3 3v5h5"/>
+                    </svg>
+                </button>
             </div>
 
             <!-- Size rows -->
@@ -240,6 +257,16 @@ $size_meta = [
 </div>
 
 <script>
+function resetBreed(breedB64) {
+    const sizes = ['PW', 'S', 'M', 'L', 'XL', 'J'];
+    sizes.forEach(code => {
+        const input   = document.getElementById('price_' + breedB64 + '_' + code);
+        const pieceEl = document.getElementById('piece_' + breedB64 + '_' + code);
+        if (input)   input.value = '';
+        if (pieceEl) pieceEl.textContent = '—';
+    });
+}
+
 function updatePiece(breedB64, code) {
     const fieldId = 'price_' + breedB64 + '_' + code;
     const pieceId = 'piece_' + breedB64 + '_' + code;
