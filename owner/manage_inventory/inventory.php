@@ -175,13 +175,8 @@ if ($pq) {
     }
 }
 
-$prices_flat = [];
-$pfq = $conn->query("SELECT size_code, AVG(price_per_tray) AS price_per_tray, AVG(price_per_piece) AS price_per_piece FROM breed_prices GROUP BY size_code");
-if ($pfq) {
-    while ($pf = $pfq->fetch_assoc()) {
-        $prices_flat[$pf['size_code']] = $pf;
-    }
-}
+// Accumulator: estimated value per size across all batches (built in the batch loop below)
+$est_value_by_size = ['PW' => 0, 'S' => 0, 'M' => 0, 'L' => 0, 'XL' => 0, 'J' => 0];
 
 // ── TODAY / WEEK HARVEST ──────────────────────────────────────────
 $today_q = $conn->query("
@@ -315,7 +310,23 @@ if ($batch_q) {
             $s_sz  = $sold_per_size[$sz] ?? 0;
             $r_sz  = max(0, $h_sz - $s_sz);
             $code  = $sizes_meta[$sz]['code'];
-            $size_remaining[$sz] = ['eggs' => $r_sz, 'trays' => (int)floor($r_sz / 30), 'code' => $code];
+            $trays = (int)floor($r_sz / 30);
+
+            // Use this batch's breed price for this size
+            $breed_price = isset($prices[$row['breed']][$code])
+                           ? (float)$prices[$row['breed']][$code]['price_per_tray']
+                           : 0;
+            $size_est_val = $trays * $breed_price;
+
+            // Add to the all-coops accumulator
+            $est_value_by_size[$code] += $size_est_val;
+
+            $size_remaining[$sz] = [
+                'eggs'    => $r_sz,
+                'trays'   => $trays,
+                'code'    => $code,
+                'est_val' => $size_est_val,  // per-coop est value for this size
+            ];
         }
 
         $row['remaining_eggs']  = $remaining_eggs;
@@ -335,17 +346,7 @@ $old_stock_batches = array_filter($batches_list, function($bl) {
     return $bl['remaining_trays'] > 0 && $days > 7;
 });
 
-// Auto-notify for old stock (All view only to prevent duplicate inserts)
-if ($is_all) {
-    foreach ($old_stock_batches as $bl) {
-        $bid   = $bl['batch_id'];
-        $check = $conn->query("SELECT 1 FROM notifications WHERE batch_id=$bid AND status IN ('unread','read') LIMIT 1");
-        if ($check->num_rows == 0) {
-            $conn->query("INSERT INTO notifications (sender_role, batch_id, target_trays, message, status)
-                VALUES ('Owner', $bid, {$bl['remaining_trays']}, 'Auto: Old stock needs priority selling.', 'unread')");
-        }
-    }
-}
+// Auto-notify removed: notifications are only created manually via the Sell First button.
 
 // ── ACTIVE NOTIFICATION ───────────────────────────────────────────
 $notif_q = $conn->query("
@@ -438,7 +439,7 @@ if ($notif) {
     </div>
 
     <!-- ACTIVE SELL-FIRST ALERT -->
-    <?php if ($notif): ?>
+    <?php if ($notif && $notif_remaining > 0): ?>
     <div class="alert-banner alert-banner--warning">
         <div class="alert-banner__body">
             <div class="alert-banner__label">Active sell-first alert — visible to all staff</div>
@@ -649,8 +650,7 @@ if ($notif) {
                 </thead>
                 <tbody>
                     <?php foreach ($stock as $key => $info):
-                        $price_tray = isset($prices_flat[$info['code']]) ? (float)$prices_flat[$info['code']]['price_per_tray'] : 0;
-                        $est_value  = $info['trays_rem'] * $price_tray;
+                        $est_value  = $est_value_by_size[$info['code']] ?? 0;
                         $share      = $total_remaining > 0 ? round(($info['remaining'] / $total_remaining) * 100, 1) : 0;
                     ?>
                     <tr <?php echo $info['remaining'] === 0 ? 'class="row-dimmed"' : ''; ?>>
@@ -669,7 +669,7 @@ if ($notif) {
                             <?php endif; ?>
                         </td>
                         <td class="col-center text-success text-sm">
-                            <?php echo ($price_tray > 0 && $info['trays_rem'] > 0)
+                            <?php echo ($est_value > 0)
                                 ? '&#8369;' . number_format($est_value, 2)
                                 : '<span class="text-muted">—</span>'; ?>
                         </td>
@@ -739,13 +739,8 @@ if ($notif) {
                         $est_val   = 0;
                         $sz_sell   = [];
                         foreach ($bl['size_rem'] as $sz => $info) {
-                            $code    = $info['code'];
-                            $breed_k = $bl['breed'];
-                            $pt      = isset($prices[$breed_k][$code])
-                                       ? (float)$prices[$breed_k][$code]['price_per_tray']
-                                       : (isset($prices_flat[$code]) ? (float)$prices_flat[$code]['price_per_tray'] : 0);
-                            $est_val += $info['trays'] * $pt;
-                            if ($info['trays'] > 0) $sz_sell[] = $code;
+                            $est_val += $info['est_val'];
+                            if ($info['trays'] > 0) $sz_sell[] = $info['code'];
                         }
                     ?>
                     <tr class="row-alert">
@@ -820,20 +815,14 @@ if ($notif) {
                         <th>Batch</th>
                         <th>Breed</th>
                         <th>Coop</th>
-                        <th>Arrived</th>
                         <th>Last Harvested By</th>
                         <th class="col-center">Harvested</th>
                         <th class="col-center">Remaining</th>
-                        <th class="col-center">Age</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($batches_list as $bl):
                         $is_old    = ($bl['batch_id'] === $oldest_batch_id && $bl['remaining_trays'] > 0);
-                        $days_old  = $bl['arrival_date']
-                                     ? (int)floor((time() - strtotime($bl['arrival_date'])) / 86400) : null;
-                        $age_color = $days_old === null ? 'var(--text-muted)'
-                                   : ($days_old > 30 ? 'var(--danger)' : ($days_old > 14 ? 'var(--warning)' : 'var(--success)'));
                         $coop_disp = $bl['coop_number'] ? 'Coop ' . $bl['coop_number'] : '—';
                         if (!empty($bl['coop_label'])) $coop_disp = $bl['coop_label'];
                     ?>
@@ -849,9 +838,6 @@ if ($notif) {
                             <a href="?coop=<?php echo $bl['batch_id']; ?>" class="link-gold text-sm">
                                 <?php echo htmlspecialchars($coop_disp); ?>
                             </a>
-                        </td>
-                        <td class="text-muted text-sm">
-                            <?php echo $bl['arrival_date'] ? date('M d, Y', strtotime($bl['arrival_date'])) : '—'; ?>
                         </td>
                         <td class="text-sm">
                             <?php if ($bl['last_harvester']): ?>
@@ -872,15 +858,6 @@ if ($notif) {
                                 <span class="text-muted text-xs"> trays</span>
                             <?php else: ?>
                                 <span class="badge badge-approved">Sold Out</span>
-                            <?php endif; ?>
-                        </td>
-                        <td class="col-center">
-                            <?php if ($days_old !== null): ?>
-                                <span style="color:<?php echo $age_color; ?>; font-weight:700; font-size:0.88rem;">
-                                    <?php echo $days_old; ?>d
-                                </span>
-                            <?php else: ?>
-                                <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
                     </tr>
