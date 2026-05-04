@@ -77,6 +77,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     log_activity($conn, $owner_id, 'Owner', 'Edit Request Approved',
                         "Approved edit request #{$request_id} ({$record_type} #{$record_id}) by {$req_row['staff_name']}");
 
+                    // Notify the staff member their edit was approved
+                    $notif_msg_approve = "Your edit request on {$record_type} #{$record_id} was approved.";
+                    if (!empty($owner_note)) $notif_msg_approve .= " Owner note: {$owner_note}";
+                    $sn = $conn->prepare("
+                        INSERT INTO staff_notifications (staff_id, notif_type, message, record_type, record_id, status, created_at)
+                        VALUES (?, 'request_outcome', ?, ?, ?, 'unread', NOW())
+                    ");
+                    $sn->bind_param('issi', $req_row['staff_id'], $notif_msg_approve, $record_type, $record_id);
+                    $sn->execute();
+                    $sn->close();
+
                     $flash = "<div class='alert success'>Edit approved and record updated.</div>";
                 } else {
                     $flash = "<div class='alert error'>Failed to apply the change. Please try again.</div>";
@@ -95,6 +106,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 log_activity($conn, $owner_id, 'Owner', 'Edit Request Rejected',
                     "Rejected edit request #{$request_id} ({$record_type} #{$record_id}) by {$req_row['staff_name']}");
+
+                // Notify the staff member their edit was rejected
+                $notif_msg_reject = "Your edit request on {$record_type} #{$record_id} was rejected.";
+                if (!empty($owner_note)) $notif_msg_reject .= " Owner note: {$owner_note}";
+                $sn = $conn->prepare("
+                    INSERT INTO staff_notifications (staff_id, notif_type, message, record_type, record_id, status, created_at)
+                    VALUES (?, 'request_outcome', ?, ?, ?, 'unread', NOW())
+                ");
+                $sn->bind_param('issi', $req_row['staff_id'], $notif_msg_reject, $record_type, $record_id);
+                $sn->execute();
+                $sn->close();
 
                 $flash = "<div class='alert warning'>Edit request rejected.</div>";
             }

@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
     } elseif ($action === 'mark_all_read') {
-        $conn->query("UPDATE staff_notifications SET status = 'read', read_at = NOW() WHERE status = 'unread'");
+        $conn->query("UPDATE staff_notifications SET status = 'read', read_at = NOW() WHERE status = 'unread' AND notif_type IN ('edit_request','delete_request','progress_update','sale_request')");
         log_activity($conn, $owner_id, 'Owner', 'Notifications Read', 'Marked all notifications as read');
         $flash = "<div class='alert success'>All notifications marked as read.</div>";
     }
@@ -49,10 +49,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // ── Data ──────────────────────────────────────────────────────
 
+// Owner only sees staff-submitted requests (edit/delete), NOT outcome notifications sent back to staff
 $result = $conn->query("
     SELECT sn.*, u.username AS staff_name
     FROM   staff_notifications sn
     JOIN   users u ON sn.staff_id = u.user_id
+    WHERE  sn.notif_type IN ('edit_request', 'delete_request', 'progress_update', 'sale_request')
     ORDER  BY FIELD(sn.status, 'unread', 'read'), sn.created_at DESC
     LIMIT  100
 ");
@@ -209,14 +211,9 @@ $default_config = [
         </div>
 
         <!-- Actions -->
-        <div class="notif-card__footer">
+        <div class="notif-card__footer" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
 
-            <a href="<?= htmlspecialchars($config['review_href']) ?>"
-               class="btn-farm btn-orange btn-sm">
-                <?= htmlspecialchars($config['review_label']) ?>
-                <i class="fa-solid fa-arrow-right" style="font-size:.7rem;"></i>
-            </a>
-
+            <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
             <?php if ($is_unread): ?>
             <form method="POST">
                 <input type="hidden" name="notif_action" value="mark_read">
@@ -232,6 +229,23 @@ $default_config = [
                     Read <?= date('M j · g:i A', strtotime($n['read_at'])) ?>
                 </span>
             <?php endif; ?>
+            </div>
+
+            <a href="<?= htmlspecialchars($config['review_href']) ?>"
+               title="<?= htmlspecialchars($config['review_label']) ?>"
+               style="display:inline-flex; align-items:center; gap:6px;
+                      font-size:0.82rem; font-weight:700; color:var(--gold);
+                      text-decoration:none; white-space:nowrap;
+                      transition:opacity 0.15s;"
+               onmouseover="this.style.opacity='0.7'"
+               onmouseout="this.style.opacity='1'">
+                <?= htmlspecialchars($config['review_label']) ?>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="5" y1="12" x2="19" y2="12"/>
+                    <polyline points="12 5 19 12 12 19"/>
+                </svg>
+            </a>
 
         </div>
 

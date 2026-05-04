@@ -4,16 +4,20 @@ function get_notification_count($conn, $role) {
     if (!$conn || !$role) return 0;
 
     if ($role === 'Staff') {
-        // Only count active (unread + read) sell-first alerts — completed ones are invisible to staff
-        $q = $conn->query("SELECT COUNT(*) AS c FROM notifications WHERE status IN ('unread','read')");
-        return $q ? (int)$q->fetch_assoc()['c'] : 0;
+        // Count unread request outcomes from staff_notifications (approved/rejected decisions)
+        $uid = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        if ($uid <= 0) return 0;
+        $q = $conn->prepare("SELECT COUNT(*) AS c FROM staff_notifications WHERE staff_id = ? AND status = 'unread' AND notif_type = 'request_outcome'");
+        $q->bind_param('i', $uid);
+        $q->execute();
+        $row = $q->get_result()->fetch_assoc();
+        $q->close();
+        return (int)($row['c'] ?? 0);
     } else {
-        // Owner: unread staff edit/delete requests + unread sell-first alerts
-        $q1 = $conn->query("SELECT COUNT(*) AS c FROM staff_notifications WHERE status = 'unread'");
-        $q2 = $conn->query("SELECT COUNT(*) AS c FROM notifications WHERE status = 'unread'");
+        // Owner: only count unread staff-submitted requests (not outcome notifications going back to staff)
+        $q1 = $conn->query("SELECT COUNT(*) AS c FROM staff_notifications WHERE status = 'unread' AND notif_type IN ('edit_request','delete_request','progress_update','sale_request')");
         $c1 = $q1 ? (int)$q1->fetch_assoc()['c'] : 0;
-        $c2 = $q2 ? (int)$q2->fetch_assoc()['c'] : 0;
-        return $c1 + $c2;
+        return $c1;
     }
 }
 
@@ -52,15 +56,21 @@ function render_notification_panel($conn, $role) {
                     + unread sell-first alerts (notifications, newest 3)
     */
     if ($role === 'Staff') {
-        $notifs_q = $conn->query("
-            SELECT n.*, b.breed
-            FROM notifications n
-            JOIN batches b ON n.batch_id = b.batch_id
-            WHERE n.status IN ('unread', 'read')
-            ORDER BY FIELD(n.status,'unread','read'), n.created_at DESC
-            LIMIT 5
-        ");
-        $notifs   = $notifs_q ? $notifs_q->fetch_all(MYSQLI_ASSOC) : [];
+        $uid = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
+        $notifs = [];
+        if ($uid > 0) {
+            $sq = $conn->prepare("
+                SELECT *
+                FROM staff_notifications
+                WHERE staff_id = ? AND notif_type = 'request_outcome'
+                ORDER BY FIELD(status,'unread','read'), created_at DESC
+                LIMIT 5
+            ");
+            $sq->bind_param('i', $uid);
+            $sq->execute();
+            $notifs = $sq->get_result()->fetch_all(MYSQLI_ASSOC);
+            $sq->close();
+        }
         $requests = [];
         $view_all_link  = 'my_notifications.php';
         $view_all_label = 'View All Notifications →';
@@ -71,6 +81,7 @@ function render_notification_panel($conn, $role) {
             FROM staff_notifications sn
             JOIN users u ON sn.staff_id = u.user_id
             WHERE sn.status = 'unread'
+              AND sn.notif_type IN ('edit_request','delete_request','progress_update','sale_request')
             ORDER BY sn.created_at DESC
             LIMIT 3
         ");
@@ -152,35 +163,52 @@ function render_notification_panel($conn, $role) {
     <?php endforeach; endif; ?>
 
     <?php
-    // Staff + Owner: show active sell-first alert previews
-    if (!empty($notifs)):
+    // Staff panel: show request outcome cards (approved/rejected decisions)
+    if ($role === 'Staff' && !empty($notifs)):
         $has_content = true;
         foreach ($notifs as $n):
-        $status_dot = $n['status'] === 'unread'
-            ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--danger);vertical-align:middle;margin-right:3px;"></span>'
-            : '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--warning);vertical-align:middle;margin-right:3px;"></span>';
+            $is_unread  = $n['status'] === 'unread';
+            $msg_lower  = strtolower($n['message']);
+            $is_approved = strpos($msg_lower, 'approved') !== false;
+            $dot_color  = $is_unread ? 'var(--danger)' : 'var(--border-mid)';
+            $label_color = $is_approved ? 'var(--success)' : 'var(--danger)';
+            $label_text  = $is_approved ? 'Approved' : 'Rejected';
     ?>
     <div style="padding:11px 16px; border-bottom:1px solid var(--border-subtle);
-                <?php echo $n['status'] === 'unread' ? 'background:rgba(194,58,58,0.05);' : ''; ?>">
-        <div style="font-size:0.75rem; font-weight:700; color:var(--danger); margin-bottom:2px;">
-            <?php echo $status_dot; ?> Sell-First Alert
-            — Batch #<?php echo (int)$n['batch_id']; ?> <?php echo htmlspecialchars($n['breed']); ?>
-        </div>
-        <div style="font-size:0.8rem; color:var(--text-secondary);">
-            Target: <strong><?php echo number_format($n['target_trays']); ?></strong> trays
-            <?php if ($role === 'Staff' && $n['status'] === 'unread'): ?>
-            <span style="color:var(--danger); font-size:0.72rem;"> · Tap to view</span>
-            <?php elseif ($role === 'Owner'): ?>
-            <span style="color:var(--danger); font-size:0.72rem;"> · Not seen by staff yet</span>
+                <?php echo $is_unread ? 'background:rgba(194,58,58,0.05);' : ''; ?>">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+            <div style="flex:1;">
+                <div style="font-size:0.75rem; font-weight:700; color:<?php echo $label_color; ?>; margin-bottom:2px; display:inline-flex; align-items:center; gap:4px;">
+                    <?php if ($is_approved): ?>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    <?php else: ?>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <?php endif; ?>
+                    <?php echo $label_text; ?>
+                    <?php if (!empty($n['record_type']) && !empty($n['record_id'])): ?>
+                        — <?php echo htmlspecialchars($n['record_type']); ?> #<?php echo (int)$n['record_id']; ?>
+                    <?php endif; ?>
+                </div>
+                <div style="font-size:0.8rem; color:var(--text-secondary);">
+                    <?php echo htmlspecialchars(mb_strimwidth($n['message'], 0, 65, '…')); ?>
+                </div>
+                <div style="font-size:0.68rem; color:var(--text-muted); margin-top:3px;">
+                    <?php echo date('M d, g:i A', strtotime($n['created_at'])); ?>
+                </div>
+            </div>
+            <?php if ($is_unread): ?>
+            <span style="display:inline-block; width:7px; height:7px; border-radius:50%;
+                         background:var(--danger); flex-shrink:0; margin-top:4px;"></span>
             <?php endif; ?>
-        </div>
-        <div style="font-size:0.68rem; color:var(--text-muted); margin-top:3px;">
-            <?php echo date('M d, g:i A', strtotime($n['created_at'])); ?>
         </div>
     </div>
     <?php endforeach; endif; ?>
 
-    <?php if (!$has_content): ?>
+    <?php
+    // Owner panel: sell-first alerts section has been removed since owner no longer uses that feature.
+    // $notifs for Owner is always empty now.
+
+    if (!$has_content): ?>
     <div style="padding:2rem; text-align:center; color:var(--text-muted); font-size:0.85rem;">
         <div style="margin-bottom:8px;">
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.4;"><path d="M13.73 21a2 2 0 0 1-3.46 0"/><path d="M18.63 13A17.9 17.9 0 0 1 18 8"/><path d="M6.26 6.26A5.86 5.86 0 0 0 6 8c0 7-3 9-3 9h14"/><path d="M18 8a6 6 0 0 0-9.33-5"/><line x1="1" y1="1" x2="23" y2="23"/></svg>

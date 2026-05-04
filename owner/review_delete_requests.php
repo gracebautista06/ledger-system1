@@ -80,6 +80,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     log_activity($conn, $owner_id, 'Owner', 'Delete Request Approved',
                         "Approved deletion of {$record_type} #{$record_id} (request #{$request_id}) by {$req_row['staff_name']}");
 
+                    // Notify the staff member their deletion was approved
+                    $notif_msg_approve = "Your deletion request for {$record_type} #{$record_id} was approved. The record has been deleted.";
+                    if (!empty($owner_note)) $notif_msg_approve .= " Owner note: {$owner_note}";
+                    $sn = $conn->prepare("
+                        INSERT INTO staff_notifications (staff_id, notif_type, message, record_type, record_id, status, created_at)
+                        VALUES (?, 'request_outcome', ?, ?, ?, 'unread', NOW())
+                    ");
+                    $sn->bind_param('issi', $req_row['staff_id'], $notif_msg_approve, $record_type, $record_id);
+                    $sn->execute();
+                    $sn->close();
+
                     $flash = "<div class='alert success'>Record deleted.</div>";
                 } else {
                     $flash = "<div class='alert error'>Failed to delete the record. It may have already been removed.</div>";
@@ -98,6 +109,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 log_activity($conn, $owner_id, 'Owner', 'Delete Request Rejected',
                     "Rejected deletion request #{$request_id} ({$record_type} #{$record_id}) by {$req_row['staff_name']}");
+
+                // Notify the staff member their deletion was rejected
+                $notif_msg_reject = "Your deletion request for {$record_type} #{$record_id} was rejected. The record has been kept.";
+                if (!empty($owner_note)) $notif_msg_reject .= " Owner note: {$owner_note}";
+                $sn = $conn->prepare("
+                    INSERT INTO staff_notifications (staff_id, notif_type, message, record_type, record_id, status, created_at)
+                    VALUES (?, 'request_outcome', ?, ?, ?, 'unread', NOW())
+                ");
+                $sn->bind_param('issi', $req_row['staff_id'], $notif_msg_reject, $record_type, $record_id);
+                $sn->execute();
+                $sn->close();
 
                 $flash = "<div class='alert warning'>Deletion request rejected. Record kept.</div>";
             }

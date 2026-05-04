@@ -1,5 +1,5 @@
 <?php
-$page_title = 'Notifications';
+$page_title = 'My Notifications';
 
 include('../includes/db.php');
 include('../includes/header.php');
@@ -10,142 +10,208 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Staff') {
 }
 
 $staff_id = (int)$_SESSION['user_id'];
-$flash    = "";
+$flash    = '';
 
-// Handle mark-as-seen
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['notif_action'] ?? '') === 'mark_read') {
-    $nid = (int)($_POST['notif_id'] ?? 0);
-    if ($nid > 0) {
-        $stmt = $conn->prepare("UPDATE notifications SET status='read', read_at=NOW() WHERE notif_id=? AND status='unread'");
-        $stmt->bind_param("i", $nid);
+// ── Mark single notification as read ─────────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['notif_action'] ?? '';
+
+    if ($action === 'mark_read') {
+        $nid = (int)($_POST['notif_id'] ?? 0);
+        if ($nid > 0) {
+            $stmt = $conn->prepare("
+                UPDATE staff_notifications
+                SET status = 'read', read_at = NOW()
+                WHERE notif_id = ? AND staff_id = ? AND status = 'unread'
+            ");
+            $stmt->bind_param('ii', $nid, $staff_id);
+            $stmt->execute();
+            $stmt->close();
+            log_activity($conn, $staff_id, 'Staff', 'Notification Acknowledged',
+                "Acknowledged request outcome notification #{$nid}");
+            $flash = "<div class='alert success'>Notification marked as seen.</div>";
+        }
+
+    } elseif ($action === 'mark_all_read') {
+        $stmt = $conn->prepare("
+            UPDATE staff_notifications
+            SET status = 'read', read_at = NOW()
+            WHERE staff_id = ? AND status = 'unread' AND notif_type = 'request_outcome'
+        ");
+        $stmt->bind_param('i', $staff_id);
         $stmt->execute();
         $stmt->close();
-        log_activity($conn, $staff_id, 'Staff', 'Notification Acknowledged',
-            "Acknowledged sell-first notification #$nid");
-        $flash = "<div class='alert success'>✅ Notification marked as seen.</div>";
+        log_activity($conn, $staff_id, 'Staff', 'All Notifications Acknowledged',
+            'Marked all request outcome notifications as read');
+        $flash = "<div class='alert success'>All notifications marked as seen.</div>";
     }
 }
 
-// Fetch ONLY active notifications (unread + read) — completed ones are hidden from staff
-$notifs_q = $conn->query("
-    SELECT n.*, b.breed, b.arrival_date,
-        GREATEST(0,
-            FLOOR(COALESCE((SELECT SUM(h.total_eggs) FROM harvests h WHERE h.batch_id = n.batch_id),0) / 30) -
-            COALESCE((SELECT SUM(s.quantity_sold) FROM sales s
-                      WHERE s.date_sold >= COALESCE(b.arrival_date,'2000-01-01')),0)
-        ) AS remaining_trays
-    FROM notifications n
-    JOIN batches b ON n.batch_id = b.batch_id
-    WHERE n.status IN ('unread', 'read')
-    ORDER BY
-        FIELD(n.status,'unread','read'),
-        n.created_at DESC
-    LIMIT 30
+// ── Fetch request outcome notifications for this staff member ─
+$notifs_q = $conn->prepare("
+    SELECT *
+    FROM staff_notifications
+    WHERE staff_id = ? AND notif_type = 'request_outcome'
+    ORDER BY FIELD(status, 'unread', 'read'), created_at DESC
+    LIMIT 50
 ");
+$notifs_q->bind_param('i', $staff_id);
+$notifs_q->execute();
+$result = $notifs_q->get_result();
+$notifs_q->close();
+
+$notifications = [];
+$unread_count  = 0;
+
+while ($row = $result->fetch_assoc()) {
+    if ($row['status'] === 'unread') $unread_count++;
+    $notifications[] = $row;
+}
 ?>
 
 <div style="max-width:860px; margin:2rem auto;">
 
     <div class="page-header">
         <div>
-            <h2>Notifications</h2>
-            <p>Priority sell-first alerts from the Owner.</p>
+            <h2>
+                My Notifications
+                <?php if ($unread_count > 0): ?>
+                <span class="badge badge-critical" style="font-size:0.68rem; vertical-align:middle; margin-left:8px;">
+                    <?php echo $unread_count; ?> NEW
+                </span>
+                <?php endif; ?>
+            </h2>
+            <p style="color:var(--text-muted); font-size:0.9rem; margin:0;">
+                Status updates on your edit and deletion requests.
+            </p>
         </div>
-        <a href="dashboard.php" class="back-link" style="margin:0;">← Dashboard</a>
+        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <?php if ($unread_count > 0): ?>
+            <form method="POST" style="margin:0;">
+                <input type="hidden" name="notif_action" value="mark_all_read">
+                <button type="submit" class="btn-farm btn-outline btn-sm">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark all as seen
+                </button>
+            </form>
+            <?php endif; ?>
+            <a href="dashboard.php" class="back-link" style="margin:0;">← Dashboard</a>
+        </div>
     </div>
 
     <?php echo $flash; ?>
 
-    <?php if (!$notifs_q || $notifs_q->num_rows === 0): ?>
+    <?php if (empty($notifications)): ?>
     <div class="card">
         <div class="empty-state">
-            <p>No active notifications.</p>
-            <small>The Owner will send alerts here when action is needed.</small>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                 stroke-linecap="round" stroke-linejoin="round" style="opacity:0.35; margin-bottom:12px;">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            <p>No notifications yet.</p>
+            <small>You'll see updates here once the Owner reviews your edit or deletion requests.</small>
         </div>
     </div>
+
     <?php else:
-        while ($n = $notifs_q->fetch_assoc()):
-            $remaining = max(0, (int)$n['remaining_trays']);
-            $is_unread = $n['status'] === 'unread';
-            $border_color = $is_unread ? 'var(--danger)' : 'var(--warning)';
-            $pct = $n['target_trays'] > 0
-                ? min(100, round((($n['target_trays'] - $remaining) / $n['target_trays']) * 100))
-                : 0;
+        foreach ($notifications as $n):
+            $is_unread   = $n['status'] === 'unread';
+            $msg_lower   = strtolower($n['message']);
+            $is_approved = strpos($msg_lower, 'approved') !== false;
+
+            $border_color = $is_approved ? 'var(--success)' : 'var(--danger)';
+            $status_label = $is_approved ? 'Approved' : 'Rejected';
+            $badge_class  = $is_approved ? 'badge-healthy' : 'badge-critical';
+
+            // Extract owner note if present
+            $owner_note = '';
+            if (preg_match('/Owner note:\s*(.+)$/i', $n['message'], $match)) {
+                $owner_note = trim($match[1]);
+            }
     ?>
-    <div class="card" style="margin-bottom:1.2rem; border-left:5px solid <?php echo $border_color; ?>; padding:1.4rem 1.6rem;">
+
+    <div class="card" style="margin-bottom:1.2rem;
+         border-left:5px solid <?php echo $border_color; ?>;
+         padding:1.4rem 1.6rem;
+         <?php echo $is_unread ? 'background:rgba(0,0,0,0.02);' : ''; ?>">
 
         <!-- Header row -->
         <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+
                 <?php if ($is_unread): ?>
                     <span class="badge badge-critical" style="font-size:0.62rem;">NEW</span>
                 <?php else: ?>
                     <span class="badge badge-pending" style="font-size:0.62rem;">SEEN</span>
                 <?php endif; ?>
-                <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">
-                    Batch #<?php echo $n['batch_id']; ?> — <?php echo htmlspecialchars($n['breed']); ?>
+
+                <span class="badge <?php echo $badge_class; ?>" style="font-size:0.62rem;">
+                    <?php if ($is_approved): ?>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:2px;"><polyline points="20 6 9 17 4 12"/></svg>
+                    <?php else: ?>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:2px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <?php endif; ?>
+                    <?php echo $status_label; ?>
                 </span>
+
+                <?php if (!empty($n['record_type']) && !empty($n['record_id'])): ?>
+                <span class="badge badge-pending" style="font-size:0.62rem;">
+                    <?php echo htmlspecialchars($n['record_type']); ?> #<?php echo (int)$n['record_id']; ?>
+                </span>
+                <?php endif; ?>
+
             </div>
-            <span style="font-size:0.75rem; color:var(--text-muted);">
-                Sent <?php echo date('M d, Y g:i A', strtotime($n['created_at'])); ?>
+            <span style="font-size:0.75rem; color:var(--text-muted); white-space:nowrap;">
+                <?php echo date('M d, Y g:i A', strtotime($n['created_at'])); ?>
             </span>
         </div>
 
-        <!-- Message -->
-        <div style="font-size:0.88rem; color:var(--text-secondary); line-height:1.6; margin-bottom:14px;">
-            <?php echo htmlspecialchars($n['message']); ?>
+        <!-- Message body -->
+        <div style="font-size:0.9rem; color:var(--text-secondary); line-height:1.6; margin-bottom:<?php echo ($owner_note || $is_unread) ? '14px' : '0'; ?>;">
+            <?php
+            $clean_msg = preg_replace('/\s*Owner note:.+$/i', '', $n['message']);
+            echo htmlspecialchars($clean_msg);
+            ?>
         </div>
 
-        <!-- Stats + progress -->
-        <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; align-items:center;">
-            <div style="background:var(--bg-wood); border-radius:var(--radius-sm); padding:8px 14px;
-                        border:1px solid var(--border-mid); text-align:center; min-width:90px;">
-                <div style="font-size:0.62rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Target</div>
-                <div style="font-size:1.4rem; font-weight:800; color:var(--danger); font-family:'Playfair Display',serif; line-height:1.2;">
-                    <?php echo number_format($n['target_trays']); ?>
-                </div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">trays</div>
-            </div>
-            <div style="background:var(--bg-wood); border-radius:var(--radius-sm); padding:8px 14px;
-                        border:1px solid var(--border-mid); text-align:center; min-width:90px;">
-                <div style="font-size:0.62rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Remaining</div>
-                <div style="font-size:1.4rem; font-weight:800; color:var(--gold); font-family:'Playfair Display',serif; line-height:1.2;">
-                    <?php echo $remaining; ?>
-                </div>
-                <div style="font-size:0.68rem; color:var(--text-muted);">trays</div>
-            </div>
-            <div style="flex:1; min-width:180px;">
-                <div style="font-size:0.7rem; color:var(--text-muted); margin-bottom:5px;">
-                    Progress — <?php echo $pct; ?>% sold
-                </div>
-                <div style="background:var(--bg-plank); border-radius:4px; height:8px; overflow:hidden;">
-                    <div style="width:<?php echo $pct; ?>%; background:<?php echo $pct >= 100 ? 'var(--success)' : 'var(--terra-lt)'; ?>;
-                                height:8px; border-radius:4px; transition:width 0.5s;"></div>
-                </div>
-            </div>
+        <!-- Owner note (if any) -->
+        <?php if (!empty($owner_note)): ?>
+        <div style="background:var(--bg-wood); border-radius:var(--radius-sm); padding:10px 14px;
+                    border-left:3px solid var(--border-mid); margin-bottom:14px;
+                    font-size:0.85rem; color:var(--text-secondary); line-height:1.6;">
+            <strong style="font-size:0.7rem; font-weight:700; color:var(--text-muted);
+                            text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:4px;">
+                Owner's Note
+            </strong>
+            <?php echo htmlspecialchars($owner_note); ?>
         </div>
+        <?php endif; ?>
 
-        <!-- Action buttons -->
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-            <a href="log_sale.php" class="btn-farm btn-danger btn-sm" style="font-size:0.85rem;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Record Sale
-            </a>
+        <!-- Actions -->
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
             <a href="view_logs.php" class="btn-farm btn-dark btn-sm" style="font-size:0.85rem;">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>View Logs
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>View My Logs
             </a>
+
             <?php if ($is_unread): ?>
             <form method="POST" style="margin:0;">
                 <input type="hidden" name="notif_action" value="mark_read">
-                <input type="hidden" name="notif_id"     value="<?php echo $n['notif_id']; ?>">
+                <input type="hidden" name="notif_id" value="<?php echo (int)$n['notif_id']; ?>">
                 <button type="submit" class="btn-farm btn-outline btn-sm" style="font-size:0.85rem;">
                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark as Seen
                 </button>
             </form>
             <?php endif; ?>
+
+            <?php if (!empty($n['read_at'])): ?>
+            <span style="font-size:0.72rem; color:var(--text-muted);">
+                Seen <?php echo date('M d · g:i A', strtotime($n['read_at'])); ?>
+            </span>
+            <?php endif; ?>
         </div>
 
     </div>
-    <?php endwhile; endif; ?>
+    <?php endforeach; endif; ?>
 
 </div>
 
