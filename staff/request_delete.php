@@ -1,5 +1,4 @@
 <?php
-/*  staff/request_delete.php — Submit a Log Deletion Request  */
 $page_title = 'Request Deletion';
 
 include('../includes/db.php');
@@ -51,7 +50,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
     $reason = trim($_POST['reason'] ?? '');
 
     if (empty($reason)) {
-        $message = "<div class='alert error'>⚠️ Please provide a reason for the deletion request.</div>";
+        $message = "<div class='alert error'> Please provide a reason for the deletion request.</div>";
     } else {
         $ins = $conn->prepare("
 INSERT INTO edit_requests 
@@ -94,7 +93,7 @@ VALUES (?,?,?,'Delete',?,'Pending',NOW())
 ?>
 
 <div class="card" style="max-width:540px; margin:2rem auto; border-top:5px solid var(--danger);">
-    <h3 style="color:var(--danger); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">🗑️ Request Record Deletion</h3>
+    <h3 style="color:var(--danger); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">Request Record Deletion</h3>
     <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:2rem;">
         This sends a deletion request to the Owner for approval. The record will not be removed until the Owner approves.
     </p>
@@ -128,7 +127,7 @@ VALUES (?,?,?,'Delete',?,'Pending',NOW())
     </div>
 
     <?php if ($already_pending): ?>
-        <div class="alert warning">⏳ You already have a pending deletion request for this record. Wait for the Owner to review it.</div>
+        <div class="alert warning"> You already have a pending deletion request for this record. Wait for the Owner to review it.</div>
         <a href="view_logs.php" class="btn-farm btn-outline btn-full" style="text-align:center; margin-top:1rem;">← Back to My Logs</a>
     <?php else: ?>
         <?php echo $message; ?>
@@ -139,7 +138,7 @@ VALUES (?,?,?,'Delete',?,'Pending',NOW())
                           placeholder="Example: This entry was logged twice by mistake."></textarea>
             </div>
             <button type="submit" class="btn-farm btn-danger btn-full" style="padding:14px; margin-top:0.5rem;">
-                🗑️ Send Deletion Request to Owner
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Send Deletion Request to Owner
             </button>
         </form>
         <a href="view_logs.php" class="back-link" style="display:block; text-align:center; margin-top:1rem;">← Cancel and Go Back</a>

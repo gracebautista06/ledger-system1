@@ -1,5 +1,4 @@
 <?php
-/*  staff/dashboard.php  */
 $page_title = 'Dashboard';
 
 include('../includes/db.php');
@@ -48,11 +47,10 @@ function stat_card(string $label, string $value, string $sub, string $accent): v
     </div>
 <?php }
 
-function action_card(string $title, string $desc, string $href, string $btn_label, string $accent): void { ?>
+function action_card(string $title, string $href, string $btn_label, string $accent): void { ?>
     <a href="<?= htmlspecialchars($href) ?>" class="action-card" style="--accent:<?= $accent ?>;">
         <div class="action-card__body">
             <h3 class="action-card__title"><?= htmlspecialchars($title) ?></h3>
-            <p class="action-card__desc"><?= htmlspecialchars($desc) ?></p>
         </div>
         <span class="action-card__btn"><?= htmlspecialchars($btn_label) ?></span>
     </a>
@@ -186,13 +184,6 @@ function action_card(string $title, string $desc, string $href, string $btn_labe
         margin: 0 0 6px;
     }
 
-    .action-card__desc {
-        font-size: 0.8rem;
-        color: var(--text-muted);
-        margin: 0 0 1.25rem;
-        line-height: 1.5;
-    }
-
     .action-card__btn {
         display: inline-block;
         padding: 8px 16px;
@@ -261,10 +252,10 @@ function action_card(string $title, string $desc, string $href, string $btn_labe
 
 <div class="actions-grid">
     <?php
-    action_card('Harvest',    'Log egg counts by grade (PW, S, M, L, XL, J).', 'log_harvest.php', 'Record Harvest', 'var(--gold)');
-    action_card('Sales',      'Log a sale — customer, quantity, and payment.',   'log_sale.php',    'New Sale',       'var(--success)');
-    action_card('Flock',      'Report feed usage, health observations, or mortality.', 'log_health.php', 'Update Status', 'var(--terra-lt)');
-    action_card('Log History','Review entries and submit correction requests.',  'view_logs.php',   'View Logs',      'var(--info)');
+    action_card('Harvest',     'log_harvest.php', 'Record Harvest', 'var(--gold)');
+    action_card('Sales',       'log_sale.php',    'New Sale',       'var(--success)');
+    action_card('Flock',       'log_health.php',  'Update Status',  'var(--terra-lt)');
+    action_card('Log History', 'view_logs.php',   'View Logs',      'var(--info)');
     ?>
 </div>
 

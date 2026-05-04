@@ -1,16 +1,4 @@
 <?php
-/*  staff/log_sale.php — Record a New Egg Sale (Breed-Aware)
- *
- *  CHANGES from previous version:
- *  - Staff selects WHICH BREED they're selling from first
- *  - Prices auto-load from breed_prices table for that breed
- *  - Available stock is calculated per-breed per-size
- *    (harvests filtered by batch_id, which links to breed)
- *  - Breed selector only shows breeds that have stock available
- *  - If no breed selected yet, the size table is hidden
- *  - All existing validations (stock check, server-side) preserved
- */
-
 $page_title = 'Record Sale';
 
 include('../includes/db.php');
@@ -299,7 +287,7 @@ $has_any_stock = !empty($available_batches);
 <div class="card" style="max-width:720px; margin:2rem auto; border-top:5px solid var(--success);">
 
     <h2 style="color:var(--gold); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">
-        💰 Record New Sale
+         Record New Sale
     </h2>
     <p style="color:var(--text-muted); margin-bottom:1.6rem; font-size:0.88rem;">
         Select the coop, then enter trays sold per size. Prices load automatically.
@@ -311,7 +299,7 @@ $has_any_stock = !empty($available_batches);
     <div style="background:var(--danger-bg); border:1px solid rgba(194,58,58,0.4);
                 border-left:5px solid var(--danger); border-radius:var(--radius);
                 padding:20px 24px; text-align:center;">
-        <div style="font-size:2rem; margin-bottom:10px;">🥚</div>
+        <div style="font-size:2rem; margin-bottom:10px;"></div>
         <div style="font-size:1rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">No Active Coops</div>
         <div style="font-size:0.88rem; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;">
             No active batches found. Add a batch in Manage Batches before recording a sale.
@@ -365,7 +353,7 @@ $has_any_stock = !empty($available_batches);
                                         margin-bottom:1.2rem;">
             <div style="font-size:0.68rem; font-weight:700; color:var(--text-muted);
                         text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">
-                📦 Available Stock — <span id="stock-breed-label"><?php echo htmlspecialchars($selected_batch ? $selected_batch['coop_label'] . ' — ' . $selected_batch['breed'] : ''); ?></span>
+                 Available Stock — <span id="stock-breed-label"><?php echo htmlspecialchars($selected_batch ? $selected_batch['coop_label'] . ' — ' . $selected_batch['breed'] : ''); ?></span>
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:7px;" id="stock-boxes">
                 <?php foreach ($size_defs as $code => $label):
@@ -518,9 +506,9 @@ $has_any_stock = !empty($available_batches);
             <div class="form-group" style="margin:0;">
                 <label>Payment Method</label>
                 <select name="payment_method" class="form-input">
-                    <option value="Cash">💵 Cash</option>
-                    <option value="GCash">📱 GCash</option>
-                    <option value="Bank Transfer">🏦 Bank Transfer</option>
+                    <option value="Cash"> Cash</option>
+                    <option value="GCash"> GCash</option>
+                    <option value="Bank Transfer"> Bank Transfer</option>
                 </select>
             </div>
             <div class="form-group" style="margin:0;">
@@ -533,7 +521,7 @@ $has_any_stock = !empty($available_batches);
 
         <button type="submit" id="submitBtn" class="btn-farm btn-green btn-full"
                 style="padding:15px; font-size:1rem;">
-            Record Sale ✅
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Record Sale
         </button>
         <a href="dashboard.php" id="backBtn" class="back-link"
            style="display:block; text-align:center; margin-top:1rem;">
@@ -697,7 +685,7 @@ function recalc() {
         btn.disabled       = hasOverLimit;
         btn.style.opacity  = hasOverLimit ? '0.45' : '1';
         btn.style.cursor   = hasOverLimit ? 'not-allowed' : '';
-        btn.textContent    = hasOverLimit ? '⚠️ Quantities exceed available stock' : 'Record Sale ✅';
+        btn.textContent    = hasOverLimit ? 'Quantities exceed available stock' : 'Record Sale';
     }
 }
 

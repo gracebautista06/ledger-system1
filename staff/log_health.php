@@ -1,5 +1,4 @@
 <?php
-/*  staff/log_health.php — Flock Health Report  */
 $page_title = 'Flock Health Report';
 
 include('../includes/db.php');
@@ -54,7 +53,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 ?>
 
 <div class="card" style="max-width:600px; margin:2rem auto; border-top:5px solid var(--terra-lt);">
-    <h2 style="color:var(--gold); font-family:'Playfair Display',serif;">🐔 Flock Health Report</h2>
+    <h2 style="color:var(--gold); font-family:'Playfair Display',serif;">Flock Health Report</h2>
     <p style="color:var(--text-muted); margin-bottom:2rem;">Report bird deaths, illness signs, or general observations.</p>
 
     <?php echo $message; ?>
@@ -97,7 +96,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
 
         <button type="submit" class="btn-farm btn-orange btn-full" style="padding:16px;">
-            Submit Health Report 🐔
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Submit Health Report
         </button>
         <a href="dashboard.php" id="backBtn" class="back-link" style="display:block; text-align:center; margin-top:1rem;">
             ← Back to Dashboard

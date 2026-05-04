@@ -1,5 +1,4 @@
 <?php
-/*  staff/request_edit.php — Submit a Log Correction Request  */
 $page_title = 'Request Edit';
 
 include('../includes/db.php');
@@ -57,7 +56,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
     };
 
     if (empty($reason)) {
-        $message = "<div class='alert error'>⚠️ Please provide a reason for the correction.</div>";
+        $message = "<div class='alert error'> Please provide a reason for the correction.</div>";
     } else {
         $ins = $conn->prepare("INSERT INTO edit_requests (staff_id, record_type, record_id, new_data, reason) VALUES (?,?,?,?,?)");
         $ins->bind_param("isiss", $staff_id, $type, $id, $new_data, $reason);
@@ -97,7 +96,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
 
 <!-- HTML below is UNCHANGED from your original -->
 <div class="card" style="max-width:540px; margin:2rem auto; border-top:5px solid var(--terra-lt);">
-    <h3 style="color:var(--gold); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">✏️ Request Record Correction</h3>
+    <h3 style="color:var(--gold); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">Request Record Correction</h3>
     <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:2rem;">
         This sends a correction request to the Owner for review.
     </p>
@@ -130,7 +129,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
     </div>
 
     <?php if ($already_pending): ?>
-        <div class="alert warning">⏳ You already have a pending request for this record. Wait for the Owner to review it first.</div>
+        <div class="alert warning"> You already have a pending request for this record. Wait for the Owner to review it first.</div>
         <a href="view_logs.php" class="btn-farm btn-outline btn-full" style="text-align:center; margin-top:1rem;">← Back to My Logs</a>
     <?php else: ?>
         <?php echo $message; ?>
@@ -160,7 +159,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
                 </div>
             <?php endif; ?>
             <button type="submit" class="btn-farm btn-orange btn-full" style="padding:14px; margin-top:0.5rem;">
-                📤 Send to Owner for Review
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send to Owner for Review
             </button>
         </form>
         <a href="view_logs.php" class="back-link" style="display:block; text-align:center; margin-top:1rem;">← Cancel and Go Back</a>

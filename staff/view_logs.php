@@ -14,15 +14,15 @@ $staff_id = (int) $_SESSION['user_id'];
 // Flash messages
 $flash = "";
 if (isset($_GET['harvest_saved'])) {
-    $flash = "<div class='alert success'>✅ Harvest logged successfully!</div>";
+    $flash = "<div class='alert success'>Harvest logged successfully.</div>";
 } elseif (isset($_GET['health_saved'])) {
-    $flash = "<div class='alert success'>✅ Health report submitted!</div>";
+    $flash = "<div class='alert success'>Health report submitted.</div>";
 } elseif (isset($_GET['sale_saved'])) {
-    $flash = "<div class='alert success'>✅ Sale recorded successfully!</div>";
+    $flash = "<div class='alert success'>Sale recorded successfully.</div>";
 } elseif (isset($_GET['request_sent'])) {
-    $flash = "<div class='alert info'>📤 Edit request sent to the Owner for review.</div>";
+    $flash = "<div class='alert info'>Edit request sent to the Owner for review.</div>";
 } elseif (isset($_GET['delete_sent'])) {
-    $flash = "<div class='alert info'>🗑️ Delete request sent to the Owner for review.</div>";
+    $flash = "<div class='alert info'>Delete request sent to the Owner for review.</div>";
 }
 
 // Fetch Harvests (with pending edit/delete request flag)
@@ -111,8 +111,7 @@ $delete_reasons = [
 
     <div class="page-header">
         <div>
-            <h2>📋 Your Recent Activity</h2>
-            <p>Last 10 harvests, 10 sales, and 5 health reports.</p>
+            <h2>Your Recent Activity</h2>
         </div>
         <a href="dashboard.php" class="back-link" style="margin:0;">← Back to Menu</a>
     </div>
@@ -122,7 +121,7 @@ $delete_reasons = [
     <!-- ── HARVEST LOGS ─────────────────────────────────── -->
     <div class="card" style="border-top:5px solid var(--gold); margin-bottom:2rem; padding:0; overflow:hidden;">
         <div style="padding:1.4rem 1.8rem 1rem; border-bottom:1px solid var(--border-subtle);">
-            <h3 style="margin:0;">🧺 Recent Harvests</h3>
+            <h3 style="margin:0;">Recent Harvests</h3>
         </div>
         <div class="table-wrapper" style="border:none; border-radius:0;">
             <table class="table-farm">
@@ -148,19 +147,21 @@ $delete_reasons = [
                             <?php else: ?>
                                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                     <button class="btn-farm btn-outline btn-sm"
-                                            onclick="openEditModal('Harvest', <?php echo $row['harvest_id']; ?>, <?php echo $row['total_eggs']; ?>)">
-                                        ✏️ Edit
+                                            onclick="openEditModal('Harvest', <?php echo $row['harvest_id']; ?>, <?php echo $row['total_eggs']; ?>)"
+                                            title="Request edit">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     </button>
                                     <button class="btn-farm btn-danger btn-sm"
-                                            onclick="openDeleteModal('Harvest', <?php echo $row['harvest_id']; ?>)">
-                                        🗑️
+                                            onclick="openDeleteModal('Harvest', <?php echo $row['harvest_id']; ?>)"
+                                            title="Request deletion">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                     </button>
                                 </div>
                             <?php endif; ?>
                         </td>
                     </tr>
                     <?php endwhile; else: ?>
-                    <tr><td colspan="6"><div class="empty-state"><span class="empty-icon">🧺</span><p>No harvest logs yet.</p></div></td></tr>
+                    <tr><td colspan="6"><div class="empty-state"><p>No harvest logs yet.</p></div></td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -170,7 +171,7 @@ $delete_reasons = [
     <!-- ── SALES LOGS ───────────────────────────────────── -->
     <div class="card" style="border-top:5px solid var(--success); margin-bottom:2rem; padding:0; overflow:hidden;">
         <div style="padding:1.4rem 1.8rem 1rem; border-bottom:1px solid var(--border-subtle);">
-            <h3 style="margin:0;">💰 Recent Sales</h3>
+            <h3 style="margin:0;">Recent Sales</h3>
         </div>
         <div class="table-wrapper" style="border:none; border-radius:0;">
             <table class="table-farm">
@@ -181,9 +182,9 @@ $delete_reasons = [
                     <?php if ($sale_logs && $sale_logs->num_rows > 0):
                         while ($row = $sale_logs->fetch_assoc()):
                             $pm_icon = match($row['payment_method']) {
-                                'GCash'         => '📱',
-                                'Bank Transfer' => '🏦',
-                                default         => '💵',
+                                'GCash'         => 'GCash',
+                                'Bank Transfer' => 'Bank',
+                                default         => 'Cash',
                             };
                             $has_edit_pending   = ((int)$row['edit_pending'] > 0);
                             $has_delete_pending = ((int)$row['delete_pending'] > 0);
@@ -211,21 +212,21 @@ $delete_reasons = [
                         <td style="font-size:0.82rem; color:var(--text-muted); max-width:150px;"><?php echo htmlspecialchars($row['notes'] ?: '—'); ?></td>
                         <td style="white-space:nowrap;">
                             <?php if ($any_pending): ?>
-                                <span class="badge badge-pending">⏳ Pending Review</span>
+                                <span class="badge badge-pending">Pending Review</span>
                                 <?php else: ?>
                             <div style="display:flex; gap:6px;">
-                                <button class="btn-farm btn-outline btn-sm"onclick="openEditModal('Sale', <?php echo $row['sale_id']; ?>, <?php echo $row['quantity_sold']; ?>)">
-                                    ✏️ Edit
+                                <button class="btn-farm btn-outline btn-sm" onclick="openEditModal('Sale', <?php echo $row['sale_id']; ?>, <?php echo $row['quantity_sold']; ?>)" title="Request edit">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                 </button>
-                                <button class="btn-farm btn-danger btn-sm"onclick="openDeleteModal('Sale', <?php echo $row['sale_id']; ?>)">
-                                    🗑️
+                                <button class="btn-farm btn-danger btn-sm" onclick="openDeleteModal('Sale', <?php echo $row['sale_id']; ?>)" title="Request deletion">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                 </button>
                              </div>
                             <?php endif; ?>
                         </td>
                     </tr>
                     <?php endwhile; else: ?>
-                    <tr><td colspan="8"><div class="empty-state"><span class="empty-icon">💰</span><p>No sales recorded yet.</p></div></td></tr>
+                    <tr><td colspan="8"><div class="empty-state"><p>No sales recorded yet.</p></div></td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -235,7 +236,7 @@ $delete_reasons = [
     <!-- ── HEALTH LOGS ──────────────────────────────────── -->
     <div class="card" style="border-top:5px solid var(--terra-lt); padding:0; overflow:hidden;">
         <div style="padding:1.4rem 1.8rem 1rem; border-bottom:1px solid var(--border-subtle);">
-            <h3 style="margin:0;">🐔 Health Reports</h3>
+            <h3 style="margin:0;">Health Reports</h3>
         </div>
         <div class="table-wrapper" style="border:none; border-radius:0;">
             <table class="table-farm">
@@ -261,23 +262,25 @@ $delete_reasons = [
                         <td style="font-size:0.85rem; max-width:200px;"><?php echo htmlspecialchars($row['symptoms'] ?: '—'); ?></td>
                         <td style="white-space:nowrap;">
                             <?php if ($any_pending): ?>
-                                <span class="badge badge-pending">⏳ Pending Review</span>
+                                <span class="badge badge-pending">Pending Review</span>
                             <?php else: ?>
                                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                     <button class="btn-farm btn-outline btn-sm"
-                                            onclick="openEditModal('Health', <?php echo $row['report_id']; ?>, <?php echo $row['mortality_count']; ?>)">
-                                        ✏️ Edit
+                                            onclick="openEditModal('Health', <?php echo $row['report_id']; ?>, <?php echo $row['mortality_count']; ?>)"
+                                            title="Request edit">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                                     </button>
                                     <button class="btn-farm btn-danger btn-sm"
-                                            onclick="openDeleteModal('Health', <?php echo $row['report_id']; ?>)">
-                                        🗑️
+                                            onclick="openDeleteModal('Health', <?php echo $row['report_id']; ?>)"
+                                            title="Request deletion">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                     </button>
                                 </div>
                             <?php endif; ?>
                         </td>
                     </tr>
                     <?php endwhile; else: ?>
-                    <tr><td colspan="6"><div class="empty-state"><span class="empty-icon">🐔</span><p>No health reports found.</p></div></td></tr>
+                    <tr><td colspan="6"><div class="empty-state"><p>No health reports found.</p></div></td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -297,7 +300,7 @@ $delete_reasons = [
             border-top:4px solid var(--gold); border-radius:var(--radius-lg);
             padding:1.6rem 1.8rem; box-shadow:var(--shadow-raised);">
     <h3 style="color:var(--gold); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">
-        ✏️ Request Edit
+        Request Edit
     </h3>
     <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.4rem;">
         This sends a correction request to the Owner for approval.
@@ -336,7 +339,7 @@ $delete_reasons = [
 
         <div style="display:flex; gap:10px; margin-top:0.5rem;">
             <button type="submit" class="btn-farm btn-orange" style="flex:1; padding:13px;">
-                📤 Send to Owner
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send to Owner
             </button>
             <button type="button" class="btn-farm btn-dark" onclick="closeEditModal()"
                     style="padding:13px; min-width:90px;">Cancel</button>
@@ -356,7 +359,7 @@ $delete_reasons = [
             border-top:4px solid var(--danger); border-radius:var(--radius-lg);
             padding:1.6rem 1.8rem; box-shadow:var(--shadow-raised);">
     <h3 style="color:var(--danger); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">
-        🗑️ Request Deletion
+        Request Deletion
     </h3>
     <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.4rem;">
         The Owner must approve deletions. The record stays until then.
@@ -382,7 +385,7 @@ $delete_reasons = [
 
         <div style="display:flex; gap:10px; margin-top:0.5rem;">
             <button type="submit" class="btn-farm btn-danger" style="flex:1; padding:13px;">
-                🗑️ Request Deletion
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Request Deletion
             </button>
             <button type="button" class="btn-farm btn-dark" onclick="closeDeleteModal()"
                     style="padding:13px; min-width:90px;">Cancel</button>

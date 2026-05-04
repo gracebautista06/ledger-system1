@@ -1,5 +1,4 @@
 <?php
-/*  staff/log_harvest.php — Daily Harvest Logger  */
 $page_title = 'Log Harvest';
 
 include('../includes/db.php');
@@ -37,9 +36,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $check->close();
 
     if (!$valid_batch) {
-        $message = "<div class='alert error'>⚠️ Invalid batch selected. Please choose an active batch.</div>";
+        $message = "<div class='alert error'> Invalid batch selected. Please choose an active batch.</div>";
     } elseif ($calculated_total === 0) {
-        $message = "<div class='alert error'>⚠️ Please enter at least one egg count before submitting.</div>";
+        $message = "<div class='alert error'> Please enter at least one egg count before submitting.</div>";
     } else {
         $ins = $conn->prepare("INSERT INTO harvests (staff_id, batch_id, total_eggs, size_pw, size_s, size_m, size_l, size_xl, size_j, notes) VALUES (?,?,?,?,?,?,?,?,?,?)");
         $ins->bind_param("iiiiiiiiss", $staff_id, $batch_id, $calculated_total, $pw, $s, $m, $l, $xl, $j, $notes);
@@ -60,8 +59,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <div class="card" style="max-width:650px; margin:2rem auto; border-top:5px solid var(--gold);">
 
-    <h2 style="color:var(--gold); font-family:'Playfair Display',serif;">🧺 Daily Harvest Log</h2>
-    <p style="color:var(--text-muted); margin-bottom:2rem;">Log counts per egg size. Total is calculated automatically.</p>
+    <h2 style="color:var(--gold); font-family:'Playfair Display',serif;">Daily Harvest Log</h2>
+    <p style="color:var(--text-muted); margin-bottom:2rem;">Log counts per egg size.</p>
 
     <?php echo $message; ?>
 
@@ -113,7 +112,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         </div>
 
         <button type="submit" class="btn-farm btn-full" style="padding:16px; font-size:1rem;">
-            Submit Harvest 🧺
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Submit Harvest
         </button>
 
         <a href="dashboard.php" id="backBtn" class="back-link" style="display:block; text-align:center; margin-top:1rem;">

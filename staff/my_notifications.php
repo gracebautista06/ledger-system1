@@ -1,10 +1,4 @@
 <?php
-/*  staff/my_notifications.php — All Owner Notifications for Staff
-    - Only shows active sell-first alerts (unread / read) — completed ones are hidden
-    - Shows progress toward sell target
-    - Mark as seen button
-    - Links to log_sale.php and view_logs.php
-*/
 $page_title = 'Notifications';
 
 include('../includes/db.php');
@@ -54,7 +48,7 @@ $notifs_q = $conn->query("
 
     <div class="page-header">
         <div>
-            <h2>🔔 Notifications</h2>
+            <h2>Notifications</h2>
             <p>Priority sell-first alerts from the Owner.</p>
         </div>
         <a href="dashboard.php" class="back-link" style="margin:0;">← Dashboard</a>
@@ -65,7 +59,6 @@ $notifs_q = $conn->query("
     <?php if (!$notifs_q || $notifs_q->num_rows === 0): ?>
     <div class="card">
         <div class="empty-state">
-            <span class="empty-icon">🔔</span>
             <p>No active notifications.</p>
             <small>The Owner will send alerts here when action is needed.</small>
         </div>
@@ -85,9 +78,9 @@ $notifs_q = $conn->query("
         <div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
                 <?php if ($is_unread): ?>
-                    <span class="badge badge-critical" style="font-size:0.62rem;">🔴 NEW</span>
+                    <span class="badge badge-critical" style="font-size:0.62rem;">NEW</span>
                 <?php else: ?>
-                    <span class="badge badge-pending" style="font-size:0.62rem;">👁️ SEEN</span>
+                    <span class="badge badge-pending" style="font-size:0.62rem;">SEEN</span>
                 <?php endif; ?>
                 <span style="font-weight:700; font-size:0.95rem; color:var(--text-primary);">
                     Batch #<?php echo $n['batch_id']; ?> — <?php echo htmlspecialchars($n['breed']); ?>
@@ -135,17 +128,17 @@ $notifs_q = $conn->query("
         <!-- Action buttons -->
         <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <a href="log_sale.php" class="btn-farm btn-danger btn-sm" style="font-size:0.85rem;">
-                💰 Record Sale Now
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>Record Sale
             </a>
             <a href="view_logs.php" class="btn-farm btn-dark btn-sm" style="font-size:0.85rem;">
-                📋 View My Logs
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>View Logs
             </a>
             <?php if ($is_unread): ?>
             <form method="POST" style="margin:0;">
                 <input type="hidden" name="notif_action" value="mark_read">
                 <input type="hidden" name="notif_id"     value="<?php echo $n['notif_id']; ?>">
                 <button type="submit" class="btn-farm btn-outline btn-sm" style="font-size:0.85rem;">
-                    ✓ Mark as Seen
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><polyline points="20 6 9 17 4 12"/></svg>Mark as Seen
                 </button>
             </form>
             <?php endif; ?>
