@@ -50,10 +50,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // ── Data ──────────────────────────────────────────────────────
 
 // Owner only sees staff-submitted requests (edit/delete), NOT outcome notifications sent back to staff
+// Also LEFT JOIN edit_requests so we can show the real request status on each card
 $result = $conn->query("
-    SELECT sn.*, u.username AS staff_name
+    SELECT sn.*, u.username AS staff_name,
+           er.status        AS request_status,
+           er.request_id    AS linked_request_id
     FROM   staff_notifications sn
-    JOIN   users u ON sn.staff_id = u.user_id
+    JOIN   users u  ON sn.staff_id  = u.user_id
+    LEFT JOIN edit_requests er
+           ON er.record_type = sn.record_type
+          AND er.record_id   = sn.record_id
+          AND er.request_type IN ('Edit','Delete')
+          -- pick the newest matching request for this record
+          AND er.request_id  = (
+              SELECT request_id FROM edit_requests er2
+              WHERE  er2.record_type  = sn.record_type
+                AND  er2.record_id    = sn.record_id
+                AND  er2.request_type IN ('Edit','Delete')
+              ORDER  BY er2.created_at DESC
+              LIMIT  1
+          )
     WHERE  sn.notif_type IN ('edit_request', 'delete_request', 'progress_update', 'sale_request')
     ORDER  BY FIELD(sn.status, 'unread', 'read'), sn.created_at DESC
     LIMIT  100
@@ -231,6 +247,23 @@ $default_config = [
             <?php endif; ?>
             </div>
 
+            <?php
+                // Determine if the linked edit/delete request is still actionable
+                $req_status = $n['request_status'] ?? null; // Pending | Approved | Rejected | null
+                $is_actionable = in_array($n['notif_type'], ['edit_request','delete_request'], true);
+            ?>
+
+            <?php if ($is_actionable && $req_status && $req_status !== 'Pending'): ?>
+                <!-- Request was already handled — show a muted status badge instead of the review link -->
+                <span style="display:inline-flex; align-items:center; gap:5px; font-size:0.78rem;
+                             font-weight:700; letter-spacing:0.4px; text-transform:uppercase;
+                             color:<?= $req_status === 'Approved' ? 'var(--success)' : 'var(--text-muted)' ?>;
+                             opacity:0.8;">
+                    <i class="fa-solid <?= $req_status === 'Approved' ? 'fa-circle-check' : 'fa-circle-xmark' ?>"
+                       style="font-size:0.7rem;"></i>
+                    Request <?= htmlspecialchars($req_status) ?>
+                </span>
+            <?php else: ?>
             <a href="<?= htmlspecialchars($config['review_href']) ?>"
                title="<?= htmlspecialchars($config['review_label']) ?>"
                style="display:inline-flex; align-items:center; gap:6px;
@@ -246,6 +279,7 @@ $default_config = [
                     <polyline points="12 5 19 12 12 19"/>
                 </svg>
             </a>
+            <?php endif; ?>
 
         </div>
 

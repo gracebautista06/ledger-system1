@@ -11,6 +11,44 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Staff') {
 
 $staff_id = (int) $_SESSION['user_id'];
 
+// ── Withdraw (cancel) a pending request ──────────────────────
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['withdraw_request_id'])) {
+    $wid = (int)$_POST['withdraw_request_id'];
+    if ($wid > 0) {
+        // Grab record info before deleting so we can clean up the notification
+        $wi = $conn->prepare("SELECT record_type, record_id, request_type FROM edit_requests WHERE request_id = ? AND staff_id = ? AND status = 'Pending'");
+        $wi->bind_param('ii', $wid, $staff_id);
+        $wi->execute();
+        $wrow = $wi->get_result()->fetch_assoc();
+        $wi->close();
+
+        if ($wrow) {
+            // Delete the request
+            $wd = $conn->prepare("DELETE FROM edit_requests WHERE request_id = ? AND staff_id = ? AND status = 'Pending'");
+            $wd->bind_param('ii', $wid, $staff_id);
+            $wd->execute();
+            $wd->close();
+
+            // Mark the matching owner notification as read
+            $notif_type = strtolower($wrow['request_type']) . '_request'; // edit_request or delete_request
+            $wn = $conn->prepare("
+                UPDATE staff_notifications
+                SET status = 'read', read_at = NOW()
+                WHERE staff_id   = ?
+                  AND notif_type = ?
+                  AND record_type = ?
+                  AND record_id   = ?
+                  AND status      = 'unread'
+            ");
+            $wn->bind_param('issi', $staff_id, $notif_type, $wrow['record_type'], $wrow['record_id']);
+            $wn->execute();
+            $wn->close();
+        }
+    }
+    header('Location: view_logs.php?withdrawn=1');
+    exit();
+}
+
 // Flash messages
 $flash = "";
 if (isset($_GET['harvest_saved'])) {
@@ -21,15 +59,17 @@ if (isset($_GET['harvest_saved'])) {
     $flash = "<div class='alert success'>Sale recorded successfully.</div>";
 } elseif (isset($_GET['request_sent'])) {
     $flash = "<div class='alert info'>Edit request sent to the Owner for review.</div>";
-} elseif (isset($_GET['delete_sent'])) {
-    $flash = "<div class='alert info'>Delete request sent to the Owner for review.</div>";
+} elseif (isset($_GET['withdrawn'])) {
+    $flash = "<div class='alert info'>Request withdrawn successfully.</div>";
 }
 
 // Fetch Harvests (with pending edit/delete request flag)
 $h_stmt = $conn->prepare("
     SELECT h.*, b.breed,
         MAX(CASE WHEN er.request_type='Edit'   AND er.status='Pending' THEN 'Pending' END) AS edit_status,
-        MAX(CASE WHEN er.request_type='Delete' AND er.status='Pending' THEN 'Pending' END) AS delete_status
+        MAX(CASE WHEN er.request_type='Delete' AND er.status='Pending' THEN 'Pending' END) AS delete_status,
+        MAX(CASE WHEN er.request_type='Edit'   AND er.status='Pending' THEN er.request_id END) AS edit_request_id,
+        MAX(CASE WHEN er.request_type='Delete' AND er.status='Pending' THEN er.request_id END) AS delete_request_id
     FROM harvests h
     JOIN batches b ON h.batch_id = b.batch_id
     LEFT JOIN edit_requests er ON er.record_id = h.harvest_id
@@ -47,7 +87,9 @@ $h_stmt->close();
 $fh_stmt = $conn->prepare("
     SELECT fh.*, b.breed,
         MAX(CASE WHEN er.request_type='Edit'   AND er.status='Pending' THEN 'Pending' END) AS edit_status,
-        MAX(CASE WHEN er.request_type='Delete' AND er.status='Pending' THEN 'Pending' END) AS delete_status
+        MAX(CASE WHEN er.request_type='Delete' AND er.status='Pending' THEN 'Pending' END) AS delete_status,
+        MAX(CASE WHEN er.request_type='Edit'   AND er.status='Pending' THEN er.request_id END) AS edit_request_id,
+        MAX(CASE WHEN er.request_type='Delete' AND er.status='Pending' THEN er.request_id END) AS delete_request_id
     FROM flock_health fh
     JOIN batches b ON fh.batch_id = b.batch_id
     LEFT JOIN edit_requests er ON er.record_id = fh.report_id
@@ -64,23 +106,10 @@ $fh_stmt->close();
 // Fetch Sales (with pending flags)
 $s_stmt = $conn->prepare("
  SELECT s.*,
-(
-    SELECT COUNT(*) 
-    FROM edit_requests er
-    WHERE er.record_id = s.sale_id
-      AND er.record_type = 'Sale'
-      AND er.request_type = 'Edit'
-      AND er.status = 'Pending'
-) AS edit_pending,
-
-(
-    SELECT COUNT(*) 
-    FROM edit_requests er
-    WHERE er.record_id = s.sale_id
-      AND er.record_type = 'Sale'
-      AND er.request_type = 'Delete'
-      AND er.status = 'Pending'
-) AS delete_pending
+(SELECT COUNT(*) FROM edit_requests er WHERE er.record_id = s.sale_id AND er.record_type = 'Sale' AND er.request_type = 'Edit'   AND er.status = 'Pending') AS edit_pending,
+(SELECT COUNT(*) FROM edit_requests er WHERE er.record_id = s.sale_id AND er.record_type = 'Sale' AND er.request_type = 'Delete' AND er.status = 'Pending') AS delete_pending,
+(SELECT er.request_id FROM edit_requests er WHERE er.record_id = s.sale_id AND er.record_type = 'Sale' AND er.request_type = 'Edit'   AND er.status = 'Pending' LIMIT 1) AS edit_request_id,
+(SELECT er.request_id FROM edit_requests er WHERE er.record_id = s.sale_id AND er.record_type = 'Sale' AND er.request_type = 'Delete' AND er.status = 'Pending' LIMIT 1) AS delete_request_id
 FROM sales s
 WHERE s.staff_id = ?
 ORDER BY s.date_sold DESC
@@ -143,7 +172,23 @@ $delete_reasons = [
                         <td style="font-size:0.85rem; max-width:180px;"><?php echo htmlspecialchars($row['notes'] ?: '—'); ?></td>
                         <td style="white-space:nowrap;">
                             <?php if ($any_pending): ?>
-                                <span class="badge badge-pending">⏳ Pending Review</span>
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span class="badge badge-pending">⏳ Pending Review</span>
+                                    <?php
+                                        $withdraw_id = $has_delete_pending
+                                            ? (int)$row['delete_request_id']
+                                            : (int)$row['edit_request_id'];
+                                    ?>
+                                    <form method="POST" style="margin:0;"
+                                          onsubmit="return confirm('Withdraw this request? This cannot be undone.')">
+                                        <input type="hidden" name="withdraw_request_id" value="<?= $withdraw_id ?>">
+                                        <button type="submit" class="btn-farm btn-dark btn-sm"
+                                                title="Withdraw request"
+                                                style="font-size:0.72rem; padding:3px 8px; opacity:0.8;">
+                                            ✕ Withdraw
+                                        </button>
+                                    </form>
+                                </div>
                             <?php else: ?>
                                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                     <button class="btn-farm btn-outline btn-sm"
@@ -212,8 +257,24 @@ $delete_reasons = [
                         <td style="font-size:0.82rem; color:var(--text-muted); max-width:150px;"><?php echo htmlspecialchars($row['notes'] ?: '—'); ?></td>
                         <td style="white-space:nowrap;">
                             <?php if ($any_pending): ?>
-                                <span class="badge badge-pending">Pending Review</span>
-                                <?php else: ?>
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span class="badge badge-pending">Pending Review</span>
+                                    <?php
+                                        $withdraw_id = $has_delete_pending
+                                            ? (int)$row['delete_request_id']
+                                            : (int)$row['edit_request_id'];
+                                    ?>
+                                    <form method="POST" style="margin:0;"
+                                          onsubmit="return confirm('Withdraw this request? This cannot be undone.')">
+                                        <input type="hidden" name="withdraw_request_id" value="<?= $withdraw_id ?>">
+                                        <button type="submit" class="btn-farm btn-dark btn-sm"
+                                                title="Withdraw request"
+                                                style="font-size:0.72rem; padding:3px 8px; opacity:0.8;">
+                                            ✕ Withdraw
+                                        </button>
+                                    </form>
+                                </div>
+                            <?php else: ?>
                             <div style="display:flex; gap:6px;">
                                 <button class="btn-farm btn-outline btn-sm" onclick="openEditModal('Sale', <?php echo $row['sale_id']; ?>, <?php echo $row['quantity_sold']; ?>)" title="Request edit">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -262,7 +323,23 @@ $delete_reasons = [
                         <td style="font-size:0.85rem; max-width:200px;"><?php echo htmlspecialchars($row['symptoms'] ?: '—'); ?></td>
                         <td style="white-space:nowrap;">
                             <?php if ($any_pending): ?>
-                                <span class="badge badge-pending">Pending Review</span>
+                                <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                    <span class="badge badge-pending">Pending Review</span>
+                                    <?php
+                                        $withdraw_id = $has_delete_pending
+                                            ? (int)$row['delete_request_id']
+                                            : (int)$row['edit_request_id'];
+                                    ?>
+                                    <form method="POST" style="margin:0;"
+                                          onsubmit="return confirm('Withdraw this request? This cannot be undone.')">
+                                        <input type="hidden" name="withdraw_request_id" value="<?= $withdraw_id ?>">
+                                        <button type="submit" class="btn-farm btn-dark btn-sm"
+                                                title="Withdraw request"
+                                                style="font-size:0.72rem; padding:3px 8px; opacity:0.8;">
+                                            ✕ Withdraw
+                                        </button>
+                                    </form>
+                                </div>
                             <?php else: ?>
                                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
                                     <button class="btn-farm btn-outline btn-sm"

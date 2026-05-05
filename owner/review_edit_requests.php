@@ -11,7 +11,11 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Owner') {
 }
 
 $owner_id = (int)$_SESSION['user_id'];
-$flash    = '';
+$flash    = match($_GET['flash'] ?? '') {
+    'approved' => "<div class='alert success'>Edit approved and record updated.</div>",
+    'rejected'  => "<div class='alert warning'>Edit request rejected.</div>",
+    default     => '',
+};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action     = $_POST['action'] ?? '';
@@ -77,6 +81,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     log_activity($conn, $owner_id, 'Owner', 'Edit Request Approved',
                         "Approved edit request #{$request_id} ({$record_type} #{$record_id}) by {$req_row['staff_name']}");
 
+                    // Auto-mark the owner's notification as read now that the request is resolved
+                    $conn->query("
+                        UPDATE staff_notifications
+                        SET status = 'read', read_at = NOW()
+                        WHERE notif_type = 'edit_request'
+                          AND record_type = '{$conn->real_escape_string($record_type)}'
+                          AND record_id   = {$record_id}
+                          AND status      = 'unread'
+                    ");
+
                     // Notify the staff member their edit was approved
                     $notif_msg_approve = "Your edit request on {$record_type} #{$record_id} was approved.";
                     if (!empty($owner_note)) $notif_msg_approve .= " Owner note: {$owner_note}";
@@ -88,7 +102,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sn->execute();
                     $sn->close();
 
-                    $flash = "<div class='alert success'>Edit approved and record updated.</div>";
+                    header('Location: review_edit_requests.php?flash=approved');
+                    exit();
                 } else {
                     $flash = "<div class='alert error'>Failed to apply the change. Please try again.</div>";
                 }
@@ -107,6 +122,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 log_activity($conn, $owner_id, 'Owner', 'Edit Request Rejected',
                     "Rejected edit request #{$request_id} ({$record_type} #{$record_id}) by {$req_row['staff_name']}");
 
+                // Auto-mark the owner's notification as read now that the request is resolved
+                $conn->query("
+                    UPDATE staff_notifications
+                    SET status = 'read', read_at = NOW()
+                    WHERE notif_type = 'edit_request'
+                      AND record_type = '{$conn->real_escape_string($record_type)}'
+                      AND record_id   = {$record_id}
+                      AND status      = 'unread'
+                ");
+
                 // Notify the staff member their edit was rejected
                 $notif_msg_reject = "Your edit request on {$record_type} #{$record_id} was rejected.";
                 if (!empty($owner_note)) $notif_msg_reject .= " Owner note: {$owner_note}";
@@ -118,7 +143,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sn->execute();
                 $sn->close();
 
-                $flash = "<div class='alert warning'>Edit request rejected.</div>";
+                header('Location: review_edit_requests.php?flash=rejected');
+                exit();
             }
         }
     }

@@ -11,7 +11,12 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Owner') {
 }
 
 $owner_id = (int)$_SESSION['user_id'];
-$flash    = '';
+$flash    = match($_GET['flash'] ?? '') {
+    'approved' => "<div class='alert success'>Record deleted.</div>",
+    'rejected'  => "<div class='alert warning'>Deletion request rejected. Record kept.</div>",
+    'failed'    => "<div class='alert error'>Failed to delete the record. It may have already been removed.</div>",
+    default     => '',
+};
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action     = $_POST['action'] ?? '';
@@ -80,6 +85,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     log_activity($conn, $owner_id, 'Owner', 'Delete Request Approved',
                         "Approved deletion of {$record_type} #{$record_id} (request #{$request_id}) by {$req_row['staff_name']}");
 
+                    // Auto-mark the owner's notification as read now that the request is resolved
+                    $conn->query("
+                        UPDATE staff_notifications
+                        SET status = 'read', read_at = NOW()
+                        WHERE notif_type = 'delete_request'
+                          AND record_type = '{$conn->real_escape_string($record_type)}'
+                          AND record_id   = {$record_id}
+                          AND status      = 'unread'
+                    ");
+
                     // Notify the staff member their deletion was approved
                     $notif_msg_approve = "Your deletion request for {$record_type} #{$record_id} was approved. The record has been deleted.";
                     if (!empty($owner_note)) $notif_msg_approve .= " Owner note: {$owner_note}";
@@ -91,9 +106,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $sn->execute();
                     $sn->close();
 
-                    $flash = "<div class='alert success'>Record deleted.</div>";
+                    header('Location: review_delete_requests.php?flash=approved');
+                    exit();
                 } else {
-                    $flash = "<div class='alert error'>Failed to delete the record. It may have already been removed.</div>";
+                    header('Location: review_delete_requests.php?flash=failed');
+                    exit();
                 }
 
             } else {
@@ -110,6 +127,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 log_activity($conn, $owner_id, 'Owner', 'Delete Request Rejected',
                     "Rejected deletion request #{$request_id} ({$record_type} #{$record_id}) by {$req_row['staff_name']}");
 
+                // Auto-mark the owner's notification as read now that the request is resolved
+                $conn->query("
+                    UPDATE staff_notifications
+                    SET status = 'read', read_at = NOW()
+                    WHERE notif_type = 'delete_request'
+                      AND record_type = '{$conn->real_escape_string($record_type)}'
+                      AND record_id   = {$record_id}
+                      AND status      = 'unread'
+                ");
+
                 // Notify the staff member their deletion was rejected
                 $notif_msg_reject = "Your deletion request for {$record_type} #{$record_id} was rejected. The record has been kept.";
                 if (!empty($owner_note)) $notif_msg_reject .= " Owner note: {$owner_note}";
@@ -121,7 +148,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $sn->execute();
                 $sn->close();
 
-                $flash = "<div class='alert warning'>Deletion request rejected. Record kept.</div>";
+                header('Location: review_delete_requests.php?flash=rejected');
+                exit();
             }
         }
     }

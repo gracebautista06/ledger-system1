@@ -19,7 +19,7 @@ function notify_owner(
         VALUES (?, ?, ?, ?, ?, ?, 'unread', NOW())
     ");
     $stmt->bind_param(
-        "iiisss",
+        "iisiss",
         $staff_id,
         $batch_id,
         $record_type,

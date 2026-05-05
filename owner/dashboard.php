@@ -93,7 +93,6 @@ $js_rev_data = json_encode($rev_data);
         <span style="font-size:0.82rem; color:var(--text-muted); font-weight:600;">
             <?php echo date('l, F j, Y'); ?>
         </span>
-        <?php render_notification_bell($conn, 'Owner'); ?>
     </div>
 </div>
 
