@@ -47,9 +47,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!$breed) continue;
 
         $price_tray  = max(0, floatval($val));
-        $price_piece = round($price_tray / 30, 4);
         $breed_esc   = $conn->real_escape_string($breed);
         $size_esc    = $conn->real_escape_string($size_code);
+
+        // If price is zero/empty, delete the row instead of saving a zero
+        if ($price_tray <= 0) {
+            $conn->query("
+                DELETE FROM breed_prices
+                WHERE breed = '$breed_esc' AND size_code = '$size_esc'
+            ");
+            continue;
+        }
+
+        $price_piece = round($price_tray / 30, 4);
 
         // Upsert: update if exists, insert if new
         $conn->query("
@@ -169,7 +179,7 @@ $size_meta = [
         <?php foreach ($breeds as $breed):
             $breed_b64  = base64_encode($breed);
             $breed_data = $saved_prices[$breed] ?? [];
-            $any_set    = !empty($breed_data);
+            $any_set    = !empty(array_filter($breed_data, fn($r) => (float)$r['price_per_tray'] > 0));
         ?>
 
         <!-- ── ONE BREED SECTION ─────────────────────────────── -->
@@ -298,6 +308,19 @@ $size_meta = [
             </div>
         </div>
         <?php endforeach; ?>
+        </div><!-- /.breed-grid -->
+
+        <!-- Info note -->
+        <div style="background:var(--info-bg); padding:12px 16px; border-radius:var(--radius-sm);
+                    font-size:0.83rem; color:#6AABDE; border-left:4px solid var(--info);
+                    margin-bottom:1.4rem; margin-top:1.4rem;">
+            Per-piece price = tray price ÷ 30. Updates live as you type. Prices are breed-specific —
+            changing one breed's price does not affect other breeds.
+        </div>
+
+        <button type="submit" class="btn-farm btn-orange btn-full" style="padding:14px; font-size:1rem;">
+            Save
+        </button>
     </form>
     <?php endif; ?>
 
@@ -308,19 +331,7 @@ $size_meta = [
         <input type="hidden" name="hide_breed" value="<?php echo htmlspecialchars($breed_b64); ?>">
     </form>
     <?php endforeach; ?>
-    </div>
-    
-        <!-- Info note -->
-    <div style="background:var(--info-bg); padding:12px 16px; border-radius:var(--radius-sm);
-                    font-size:0.83rem; color:#6AABDE; border-left:4px solid var(--info);
-                    margin-bottom:1.4rem;">
-             Per-piece price = tray price ÷ 30. Updates live as you type. Prices are breed-specific —
-            changing one breed's price does not affect other breeds.
-    </div>
-
-        <button type="submit" class="btn-farm btn-orange btn-full" style="padding:14px; font-size:1rem;">
-             Save
-        </button>                        
+                           
     <a href="../dashboard.php" class="back-link">← Back to Dashboard</a>
 </div>
 
