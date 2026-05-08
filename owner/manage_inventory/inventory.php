@@ -25,30 +25,6 @@ $is_all       = ($coop_id === 0);
 $batch_filter = $is_all ? "" : "AND b.batch_id = $coop_id";
 $hv_filter    = $is_all ? "" : "AND h.batch_id = $coop_id";
 
-// ── HANDLE: Send Sell-First notification ──────────────────────────
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'notify_sell_first') {
-    $batch_id     = intval($_POST['batch_id']);
-    $target_trays = max(1, intval($_POST['target_trays']));
-    $sizes_raw    = trim($_POST['sizes_to_sell'] ?? '');
-    $breed_raw    = trim($_POST['breed'] ?? 'this batch');
-    $breed_esc    = $conn->real_escape_string($breed_raw);
-    $sizes_esc    = $conn->real_escape_string($sizes_raw);
-
-    $custom_raw  = trim($_POST['custom_msg'] ?? '');
-    $default_msg = "Priority sell: Batch #{$batch_id} ({$breed_raw}) — oldest stock on hand. "
-                 . "Target: {$target_trays} tray(s)."
-                 . ($sizes_raw ? " Sizes: {$sizes_raw}." : "");
-    $msg_esc = $conn->real_escape_string($custom_raw ?: $default_msg);
-
-    $conn->query("UPDATE notifications SET status='completed'
-                  WHERE batch_id=$batch_id AND status IN ('unread','read')");
-    $conn->query("INSERT INTO notifications
-                    (sender_role, batch_id, target_trays, sizes_to_sell, message, status)
-                  VALUES ('Owner', $batch_id, $target_trays, '$sizes_esc', '$msg_esc', 'unread')");
-
-    $message = "<div class='alert success'>Sell-first alert sent to all staff.</div>";
-}
-
 // ── FETCH ACTIVE BATCHES FOR TABS ─────────────────────────────────
 $tab_q = $conn->query("
     SELECT batch_id, breed,
@@ -339,39 +315,15 @@ if ($batch_q) {
     }
 }
 
-// ── OLD STOCK (>7 days on hand) ───────────────────────────────────
+// ── OLD STOCK (>7 days since last harvest) ────────────────────────
 $old_stock_batches = array_filter($batches_list, function($bl) {
-    $days = $bl['arrival_date']
-            ? (int)floor((time() - strtotime($bl['arrival_date'])) / 86400) : 0;
+    $days = $bl['last_harvest_date']
+            ? (int)floor((time() - strtotime($bl['last_harvest_date'])) / 86400) : 0;
     return $bl['remaining_trays'] > 0 && $days > 7;
 });
 
 // Auto-notify removed: notifications are only created manually via the Sell First button.
 
-// ── ACTIVE NOTIFICATION ───────────────────────────────────────────
-$notif_q = $conn->query("
-    SELECT n.*, b.breed FROM notifications n
-    JOIN batches b ON n.batch_id = b.batch_id
-    WHERE n.status IN ('unread','read')
-    ORDER BY n.created_at DESC LIMIT 1
-");
-$notif = ($notif_q && $notif_q->num_rows > 0) ? $notif_q->fetch_assoc() : null;
-
-$notif_remaining  = 0;
-$notif_sizes_left = '';
-if ($notif) {
-    foreach ($batches_list as $bl) {
-        if ($bl['batch_id'] == $notif['batch_id']) {
-            $notif_remaining = $bl['remaining_trays'];
-            $sz_parts = [];
-            foreach ($bl['size_rem'] as $sz => $info) {
-                if ($info['trays'] > 0) $sz_parts[] = $info['code'] . ': ' . $info['trays'] . 'T';
-            }
-            $notif_sizes_left = implode(', ', $sz_parts);
-            break;
-        }
-    }
-}
 ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -380,7 +332,7 @@ if ($notif) {
     <div class="page-header">
         <div>
             <h2>Egg Inventory</h2>
-            <p>Stock on hand &middot; Per-size counts &middot; Sell-first alerts</p>
+            <p>Stock on hand &middot; Per-size counts</p>
         </div>
         <span class="timestamp"><?php echo date('M d, Y — g:i A'); ?></span>
 
@@ -427,8 +379,14 @@ if ($notif) {
                 <span class="coop-info-value"><?php echo date('M d, Y', strtotime($selected_batch['arrival_date'])); ?></span>
             </div>
             <?php
-            $days_since = (int)floor((time() - strtotime($selected_batch['arrival_date'])) / 86400);
-            if ($days_since > 7 && !empty($batches_list)): ?>
+            $selected_bl = null;
+            foreach ($batches_list as $bl) {
+                if ($bl['batch_id'] == $selected_batch['batch_id']) { $selected_bl = $bl; break; }
+            }
+            $days_since = ($selected_bl && $selected_bl['last_harvest_date'])
+                ? (int)floor((time() - strtotime($selected_bl['last_harvest_date'])) / 86400)
+                : null;
+            if ($days_since !== null && $days_since > 7 && !empty($batches_list)): ?>
             <div class="coop-info-item">
                 <span class="badge badge-critical"><?php echo $days_since; ?> days on hand</span>
             </div>
@@ -437,40 +395,6 @@ if ($notif) {
         </div>
         <?php endif; ?>
     </div>
-
-    <!-- ACTIVE SELL-FIRST ALERT -->
-    <?php if ($notif && $notif_remaining > 0): ?>
-    <div class="alert-banner alert-banner--warning">
-        <div class="alert-banner__body">
-            <div class="alert-banner__label">Active sell-first alert — visible to all staff</div>
-            <div class="alert-banner__title">
-                Batch #<?php echo $notif['batch_id']; ?> — <?php echo htmlspecialchars($notif['breed']); ?>
-            </div>
-            <?php if (!empty($notif['sizes_to_sell'])): ?>
-            <div class="alert-banner__sizes">
-                Sizes: <strong><?php echo htmlspecialchars($notif['sizes_to_sell']); ?></strong>
-            </div>
-            <?php endif; ?>
-            <div class="alert-banner__message"><?php echo htmlspecialchars($notif['message']); ?></div>
-            <div class="alert-banner__meta">
-                Sent <?php echo date('M d, Y g:i A', strtotime($notif['created_at'])); ?>
-                &nbsp;&middot;&nbsp;
-                <span class="badge badge-<?php echo $notif['status'] === 'unread' ? 'warning' : 'pending'; ?>">
-                    <?php echo $notif['status'] === 'unread' ? 'Not yet seen' : 'Seen by staff'; ?>
-                </span>
-            </div>
-        </div>
-        <div class="alert-banner__stat">
-            <div class="alert-banner__stat-label">Target</div>
-            <div class="alert-banner__stat-value"><?php echo number_format($notif['target_trays']); ?></div>
-            <div class="alert-banner__stat-unit">trays to sell</div>
-            <div class="alert-banner__stat-remaining"><?php echo number_format($notif_remaining); ?> remaining</div>
-            <?php if ($notif_sizes_left): ?>
-            <div class="alert-banner__stat-sizes"><?php echo $notif_sizes_left; ?></div>
-            <?php endif; ?>
-        </div>
-    </div>
-    <?php endif; ?>
 
     <!-- STAT CARDS -->
     <div class="stat-grid">
@@ -712,7 +636,7 @@ if ($notif) {
         <div class="card__header">
             <div>
                 <h3>Old Stock</h3>
-                <p class="card__subtext">Batches with remaining trays on hand for more than 7 days.</p>
+                <p class="card__subtext">Batches with remaining trays where the last harvest was more than 7 days ago.</p>
             </div>
         </div>
         <div class="table-wrapper">
@@ -728,19 +652,16 @@ if ($notif) {
                         <?php endforeach; ?>
                         <th class="col-center">Total</th>
                         <th class="col-center">Est. Value</th>
-                        <th class="col-center">Action</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($old_stock_batches as $bl):
-                        $days_old  = $bl['arrival_date']
-                                     ? (int)floor((time() - strtotime($bl['arrival_date'])) / 86400) : '?';
+                        $days_old  = $bl['last_harvest_date']
+                                     ? (int)floor((time() - strtotime($bl['last_harvest_date'])) / 86400) : '?';
                         $age_color = is_int($days_old) && $days_old > 30 ? 'var(--danger)' : 'var(--warning)';
                         $est_val   = 0;
-                        $sz_sell   = [];
                         foreach ($bl['size_rem'] as $sz => $info) {
                             $est_val += $info['est_val'];
-                            if ($info['trays'] > 0) $sz_sell[] = $info['code'];
                         }
                     ?>
                     <tr class="row-alert">
@@ -780,17 +701,6 @@ if ($notif) {
                         </td>
                         <td class="col-center text-success text-sm">
                             <?php echo $est_val > 0 ? '&#8369;' . number_format($est_val, 2) : '<span class="text-muted">—</span>'; ?>
-                        </td>
-                        <td class="col-center">
-                            <button class="btn-farm btn-danger btn-sm"
-                                    onclick="openNotifModal(
-                                        <?php echo $bl['batch_id']; ?>,
-                                        '<?php echo addslashes(htmlspecialchars($bl['breed'], ENT_QUOTES)); ?>',
-                                        <?php echo $bl['remaining_trays']; ?>,
-                                        '<?php echo implode(', ', $sz_sell); ?>'
-                                    )">
-                                Sell First
-                            </button>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -895,48 +805,6 @@ if ($notif) {
     <a href="../dashboard.php" class="back-link">&larr; Back to Dashboard</a>
 </div>
 
-<!-- SELL-FIRST MODAL -->
-<div id="notif-overlay" class="modal-overlay" onclick="closeNotifModal()"></div>
-
-<div id="notif-modal" class="modal">
-    <h3 class="modal__title">Notify Staff: Sell First</h3>
-    <p class="modal__subtitle">Sends a priority alert to all staff. Target defaults to total old-stock trays.</p>
-
-    <form method="POST">
-        <input type="hidden" name="action"        value="notify_sell_first">
-        <input type="hidden" name="batch_id"      id="modal-batch-id"    value="">
-        <input type="hidden" name="breed"         id="modal-breed"       value="">
-        <input type="hidden" name="sizes_to_sell" id="modal-sizes-input" value="">
-
-        <div class="modal__batch-info">
-            <div class="modal__batch-info-label">Batch</div>
-            <div id="modal-batch-label" class="modal__batch-name">—</div>
-            <div id="modal-stock-label" class="modal__batch-stock">—</div>
-            <div id="modal-sizes-label" class="modal__batch-sizes"></div>
-        </div>
-
-        <div class="form-group">
-            <label>Target trays to sell</label>
-            <input type="number" name="target_trays" id="modal-target"
-                   class="form-input" min="1" required placeholder="e.g. 20">
-            <small class="form-hint">Pre-filled with total remaining old-stock trays.</small>
-        </div>
-        <div class="form-group">
-            <label>Custom message <span class="form-label-optional">(optional)</span></label>
-            <textarea name="custom_msg" class="form-input" rows="2"
-                      placeholder="Leave blank to use the auto-generated message."></textarea>
-        </div>
-        <div class="modal__actions">
-            <button type="submit" class="btn-farm btn-danger" style="flex:1; padding:13px;">
-                Send to All Staff
-            </button>
-            <button type="button" class="btn-farm btn-dark" onclick="closeNotifModal()"
-                    style="padding:13px; min-width:90px;">
-                Cancel
-            </button>
-        </div>
-    </form>
-</div>
 
 <style>
 .page-container        { max-width:1080px; margin:2rem auto; }
@@ -972,28 +840,6 @@ if ($notif) {
 .coop-info-label       { font-size:0.65rem; text-transform:uppercase; letter-spacing:0.6px;
                          color:var(--text-muted); font-weight:700; }
 .coop-info-value       { font-size:0.9rem; font-weight:700; color:var(--text-primary); }
-
-/* Alert banner */
-.alert-banner          { display:flex; justify-content:space-between; align-items:flex-start;
-                         flex-wrap:wrap; gap:14px; border-radius:var(--radius);
-                         padding:16px 20px; margin-bottom:1.5rem; }
-.alert-banner--warning { background:var(--warning-bg); border:1px solid rgba(212,144,10,0.35);
-                         border-left:5px solid var(--warning); }
-.alert-banner__label   { font-size:0.68rem; font-weight:700; color:var(--warning);
-                         text-transform:uppercase; letter-spacing:0.7px; margin-bottom:6px; }
-.alert-banner__title   { font-weight:700; font-size:0.95rem; color:var(--text-primary); margin-bottom:4px; }
-.alert-banner__sizes   { font-size:0.82rem; color:var(--gold); margin-bottom:4px; }
-.alert-banner__message { font-size:0.8rem; color:var(--text-secondary); }
-.alert-banner__meta    { font-size:0.72rem; color:var(--text-muted); margin-top:6px; }
-.alert-banner__body    { flex:1; }
-.alert-banner__stat    { text-align:right; flex-shrink:0; min-width:110px; }
-.alert-banner__stat-label    { font-size:0.65rem; font-weight:700; color:var(--text-muted);
-                               text-transform:uppercase; letter-spacing:0.6px; }
-.alert-banner__stat-value    { font-size:2.2rem; font-weight:800; font-family:'Playfair Display',serif;
-                               color:var(--gold); line-height:1.1; }
-.alert-banner__stat-unit     { font-size:0.7rem; color:var(--text-muted); }
-.alert-banner__stat-remaining { font-size:0.72rem; font-weight:700; color:var(--terra-lt); margin-top:8px; }
-.alert-banner__stat-sizes    { font-size:0.68rem; color:var(--text-muted); margin-top:2px; }
 
 /* Table helpers */
 .col-center  { text-align:center; }
@@ -1046,23 +892,6 @@ if ($notif) {
 </style>
 
 <script>
-function openNotifModal(batchId, breed, trays, sizes) {
-    document.getElementById('modal-batch-id').value    = batchId;
-    document.getElementById('modal-breed').value       = breed;
-    document.getElementById('modal-target').value      = trays;
-    document.getElementById('modal-sizes-input').value = sizes || '';
-    document.getElementById('modal-batch-label').textContent = 'Batch #' + batchId + ' — ' + breed;
-    document.getElementById('modal-stock-label').textContent = trays + ' tray(s) remaining';
-    document.getElementById('modal-sizes-label').textContent = sizes ? 'Sizes with stock: ' + sizes : '';
-    document.getElementById('notif-modal').style.display   = 'block';
-    document.getElementById('notif-overlay').style.display = 'block';
-}
-
-function closeNotifModal() {
-    document.getElementById('notif-modal').style.display   = 'none';
-    document.getElementById('notif-overlay').style.display = 'none';
-}
-
 <?php if ($is_all): ?>
 const chartColors = <?php echo json_encode(array_map(fn($s) => $s['color'], array_values($sizes_meta))); ?>;
 const sizeLabels  = <?php echo json_encode(array_map(fn($s) => $s['label'], array_values($sizes_meta))); ?>;

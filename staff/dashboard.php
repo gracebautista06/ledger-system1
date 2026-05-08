@@ -4,7 +4,6 @@ $page_title = 'Dashboard';
 include('../includes/db.php');
 include('../includes/header.php');
 include('../includes/log_activity.php');
-include('../includes/notifications.php');
 
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Staff') {
     header('Location: ../portal/login.php'); exit();
@@ -217,12 +216,7 @@ function action_card(string $title, string $href, string $btn_label, string $acc
         <h1 class="db-header__greeting"><?= htmlspecialchars($greeting) ?>, <?= htmlspecialchars($username) ?></h1>
         <p class="db-header__sub"><?= date('l, F j, Y') ?></p>
     </div>
-    <div>
-        <?php render_notification_bell($conn, 'Staff'); ?>
-    </div>
 </div>
-
-<?php render_notification_panel($conn, 'Staff'); ?>
 
 <?php if ($my_pending > 0): ?>
 <div class="alert--warning">

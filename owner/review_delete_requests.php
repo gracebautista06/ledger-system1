@@ -10,6 +10,23 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Owner') {
     exit();
 }
 
+/**
+ * Send a request_outcome notification to a staff member.
+ * Uses a fresh INSERT with explicit types and swallows any DB error
+ * so a notification failure never blocks the approve/reject action.
+ */
+function notify_staff_outcome(mysqli $conn, int $staff_id, string $message, string $record_type, int $record_id): void {
+    if ($staff_id <= 0) return;
+    $sn = $conn->prepare(
+        "INSERT INTO staff_notifications (staff_id, notif_type, message, record_type, record_id, status, created_at)
+         VALUES (?, 'request_outcome', ?, ?, ?, 'unread', NOW())"
+    );
+    if (!$sn) return;
+    $sn->bind_param('issi', $staff_id, $message, $record_type, $record_id);
+    $sn->execute();
+    $sn->close();
+}
+
 $owner_id = (int)$_SESSION['user_id'];
 $flash    = match($_GET['flash'] ?? '') {
     'approved' => "<div class='alert success'>Record deleted.</div>",
@@ -98,13 +115,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     // Notify the staff member their deletion was approved
                     $notif_msg_approve = "Your deletion request for {$record_type} #{$record_id} was approved. The record has been deleted.";
                     if (!empty($owner_note)) $notif_msg_approve .= " Owner note: {$owner_note}";
-                    $sn = $conn->prepare("
-                        INSERT INTO staff_notifications (staff_id, notif_type, message, record_type, record_id, status, created_at)
-                        VALUES (?, 'request_outcome', ?, ?, ?, 'unread', NOW())
-                    ");
-                    $sn->bind_param('issi', $req_row['staff_id'], $notif_msg_approve, $record_type, $record_id);
-                    $sn->execute();
-                    $sn->close();
+                    notify_staff_outcome($conn, (int)$req_row['staff_id'], $notif_msg_approve, $record_type, $record_id);
 
                     header('Location: review_delete_requests.php?flash=approved');
                     exit();
@@ -140,13 +151,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 // Notify the staff member their deletion was rejected
                 $notif_msg_reject = "Your deletion request for {$record_type} #{$record_id} was rejected. The record has been kept.";
                 if (!empty($owner_note)) $notif_msg_reject .= " Owner note: {$owner_note}";
-                $sn = $conn->prepare("
-                    INSERT INTO staff_notifications (staff_id, notif_type, message, record_type, record_id, status, created_at)
-                    VALUES (?, 'request_outcome', ?, ?, ?, 'unread', NOW())
-                ");
-                $sn->bind_param('issi', $req_row['staff_id'], $notif_msg_reject, $record_type, $record_id);
-                $sn->execute();
-                $sn->close();
+                notify_staff_outcome($conn, (int)$req_row['staff_id'], $notif_msg_reject, $record_type, $record_id);
 
                 header('Location: review_delete_requests.php?flash=rejected');
                 exit();

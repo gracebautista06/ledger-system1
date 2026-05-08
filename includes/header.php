@@ -80,26 +80,12 @@
                         $bell_q->close();
                         $bell_href = $root . 'owner/staff_notifications.php';
 
-                    } elseif ($bell_role === 'Staff') {
-                        // Staff sees unread owner responses (request_outcome)
-                        $bell_q = $conn->prepare("
-                            SELECT COUNT(*) AS cnt
-                            FROM staff_notifications
-                            WHERE staff_id   = ?
-                              AND status     = 'unread'
-                              AND notif_type = 'request_outcome'
-                        ");
-                        $bell_q->bind_param('i', $bell_uid);
-                        $bell_q->execute();
-                        $bell_unread = (int)$bell_q->get_result()->fetch_assoc()['cnt'];
-                        $bell_q->close();
-                        $bell_href = $root . 'staff/my_notifications.php';
-
                     } else {
                         $bell_unread = 0;
                         $bell_href   = '#';
                     }
                 ?>
+                <?php if ($bell_role === 'Owner'): ?>
                 <li>
                     <a href="<?php echo $bell_href; ?>" class="nav-bell" title="Notifications"
                        style="position:relative; display:inline-flex; align-items:center; padding:4px 6px; text-decoration:none;">
@@ -127,6 +113,7 @@
                         <?php endif; ?>
                     </a>
                 </li>
+                <?php endif; ?>
                 <?php } // end if isset($conn) ?>
 
                 <li>

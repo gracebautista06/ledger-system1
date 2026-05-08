@@ -4,15 +4,7 @@ function get_notification_count($conn, $role) {
     if (!$conn || !$role) return 0;
 
     if ($role === 'Staff') {
-        // Count unread request outcomes from staff_notifications (approved/rejected decisions)
-        $uid = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
-        if ($uid <= 0) return 0;
-        $q = $conn->prepare("SELECT COUNT(*) AS c FROM staff_notifications WHERE staff_id = ? AND status = 'unread' AND notif_type = 'request_outcome'");
-        $q->bind_param('i', $uid);
-        $q->execute();
-        $row = $q->get_result()->fetch_assoc();
-        $q->close();
-        return (int)($row['c'] ?? 0);
+        return 0;
     } else {
         // Owner: only count unread staff-submitted requests (not outcome notifications going back to staff)
         $q1 = $conn->query("SELECT COUNT(*) AS c FROM staff_notifications WHERE status = 'unread' AND notif_type IN ('edit_request','delete_request','progress_update','sale_request')");
@@ -24,7 +16,7 @@ function get_notification_count($conn, $role) {
 function render_notification_bell($conn, $role) {
     $count = get_notification_count($conn, $role);
     // ← Each role now links to their own notification page
-    $link  = $role === 'Staff' ? 'my_notifications.php' : '../owner/staff_notifications.php';
+    $link  = $role === 'Staff' ? '#' : '../owner/staff_notifications.php';
     ?>
     <a href="<?php echo $link; ?>"
        style="position:relative; display:inline-flex; align-items:center; justify-content:center;
@@ -56,24 +48,10 @@ function render_notification_panel($conn, $role) {
                     + unread sell-first alerts (notifications, newest 3)
     */
     if ($role === 'Staff') {
-        $uid = isset($_SESSION['user_id']) ? (int)$_SESSION['user_id'] : 0;
-        $notifs = [];
-        if ($uid > 0) {
-            $sq = $conn->prepare("
-                SELECT *
-                FROM staff_notifications
-                WHERE staff_id = ? AND notif_type = 'request_outcome'
-                ORDER BY FIELD(status,'unread','read'), created_at DESC
-                LIMIT 5
-            ");
-            $sq->bind_param('i', $uid);
-            $sq->execute();
-            $notifs = $sq->get_result()->fetch_all(MYSQLI_ASSOC);
-            $sq->close();
-        }
-        $requests = [];
-        $view_all_link  = 'my_notifications.php';
-        $view_all_label = 'View All Notifications →';
+        $notifs        = [];
+        $requests      = [];
+        $view_all_link  = '#';
+        $view_all_label = '';
     } else {
         // Owner — fetch unread staff edit/delete requests from staff_notifications
         $req_q = $conn->query("

@@ -59,6 +59,8 @@ if (isset($_GET['harvest_saved'])) {
     $flash = "<div class='alert success'>Sale recorded successfully.</div>";
 } elseif (isset($_GET['request_sent'])) {
     $flash = "<div class='alert info'>Edit request sent to the Owner for review.</div>";
+} elseif (isset($_GET['delete_sent'])) {
+    $flash = "<div class='alert info'>Deletion request sent to the Owner for review.</div>";
 } elseif (isset($_GET['withdrawn'])) {
     $flash = "<div class='alert info'>Request withdrawn successfully.</div>";
 }
@@ -119,21 +121,6 @@ $s_stmt->execute();
 $sale_logs = $s_stmt->get_result();
 $s_stmt->close();
 
-// Predefined reasons
-$edit_reasons = [
-    'Incorrect egg count entered',
-    'Wrong batch selected',
-    'Typo in the numbers',
-    'System error / double entry',
-    'Other (please specify)',
-];
-$delete_reasons = [
-    'Duplicate entry',
-    'Logged by mistake',
-    'Wrong date recorded',
-    'Test entry / training',
-    'Other (please specify)',
-];
 ?>
 
 <div style="max-width:1100px; margin:2rem auto;">
@@ -191,16 +178,14 @@ $delete_reasons = [
                                 </div>
                             <?php else: ?>
                                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                    <button class="btn-farm btn-outline btn-sm"
-                                            onclick="openEditModal('Harvest', <?php echo $row['harvest_id']; ?>, <?php echo $row['total_eggs']; ?>)"
-                                            title="Request edit">
+                                    <a href="request_edit.php?type=Harvest&id=<?php echo $row['harvest_id']; ?>"
+                                       class="btn-farm btn-outline btn-sm" title="Request edit">
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                    </button>
-                                    <button class="btn-farm btn-danger btn-sm"
-                                            onclick="openDeleteModal('Harvest', <?php echo $row['harvest_id']; ?>)"
-                                            title="Request deletion">
+                                    </a>
+                                    <a href="request_delete.php?type=Harvest&id=<?php echo $row['harvest_id']; ?>"
+                                       class="btn-farm btn-danger btn-sm" title="Request deletion">
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                                    </button>
+                                    </a>
                                 </div>
                             <?php endif; ?>
                         </td>
@@ -276,12 +261,14 @@ $delete_reasons = [
                                 </div>
                             <?php else: ?>
                             <div style="display:flex; gap:6px;">
-                                <button class="btn-farm btn-outline btn-sm" onclick="openEditModal('Sale', <?php echo $row['sale_id']; ?>, <?php echo $row['quantity_sold']; ?>)" title="Request edit">
+                                <a href="request_edit.php?type=Sale&id=<?php echo $row['sale_id']; ?>"
+                                   class="btn-farm btn-outline btn-sm" title="Request edit">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                </button>
-                                <button class="btn-farm btn-danger btn-sm" onclick="openDeleteModal('Sale', <?php echo $row['sale_id']; ?>)" title="Request deletion">
+                                </a>
+                                <a href="request_delete.php?type=Sale&id=<?php echo $row['sale_id']; ?>"
+                                   class="btn-farm btn-danger btn-sm" title="Request deletion">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                                </button>
+                                </a>
                              </div>
                             <?php endif; ?>
                         </td>
@@ -342,16 +329,14 @@ $delete_reasons = [
                                 </div>
                             <?php else: ?>
                                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                                    <button class="btn-farm btn-outline btn-sm"
-                                            onclick="openEditModal('Health', <?php echo $row['report_id']; ?>, <?php echo $row['mortality_count']; ?>)"
-                                            title="Request edit">
+                                    <a href="request_edit.php?type=Health&id=<?php echo $row['report_id']; ?>"
+                                       class="btn-farm btn-outline btn-sm" title="Request edit">
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                    </button>
-                                    <button class="btn-farm btn-danger btn-sm"
-                                            onclick="openDeleteModal('Health', <?php echo $row['report_id']; ?>)"
-                                            title="Request deletion">
+                                    </a>
+                                    <a href="request_delete.php?type=Health&id=<?php echo $row['report_id']; ?>"
+                                       class="btn-farm btn-danger btn-sm" title="Request deletion">
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                                    </button>
+                                    </a>
                                 </div>
                             <?php endif; ?>
                         </td>
@@ -365,161 +350,6 @@ $delete_reasons = [
     </div>
 </div>
 
-<!-- ── EDIT REQUEST MODAL ──────────────────────────────────── -->
-<div id="edit-overlay" onclick="closeEditModal()"
-     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:999;"></div>
-
-<div id="edit-modal"
-     style="display:none; position:fixed; top:50%; left:50%;
-            transform:translate(-50%,-50%); z-index:1000;
-            width:min(480px,94vw);
-            background:var(--bg-soil); border:1px solid var(--border-mid);
-            border-top:4px solid var(--gold); border-radius:var(--radius-lg);
-            padding:1.6rem 1.8rem; box-shadow:var(--shadow-raised);">
-    <h3 style="color:var(--gold); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">
-        Request Edit
-    </h3>
-    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.4rem;">
-        This sends a correction request to the Owner for approval.
-    </p>
-    <form method="GET" action="request_edit.php">
-        <input type="hidden" name="type" id="edit-type">
-        <input type="hidden" name="id"   id="edit-id">
-
-        <div class="form-group">
-            <label>Reason for Edit <span style="color:var(--danger);">*</span></label>
-            <select name="reason_preset" id="edit-reason-select" class="form-input" required
-                    onchange="toggleEditOther(this.value)">
-                <option value="" disabled selected>— Select a reason —</option>
-                <?php foreach ($edit_reasons as $r): ?>
-                <option value="<?php echo htmlspecialchars($r); ?>"><?php echo htmlspecialchars($r); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="form-group" id="edit-other-group" style="display:none;">
-            <label>Please specify</label>
-            <textarea name="reason_other" class="form-input" rows="2" placeholder="Describe the issue…"></textarea>
-        </div>
-
-        <div class="form-group" id="edit-harvest-field" style="display:none;">
-            <label>Corrected Total Eggs</label>
-            <input type="number" name="new_total" id="edit-new-total" class="form-input" min="0">
-        </div>
-        <div class="form-group" id="edit-health-field" style="display:none;">
-            <label>Corrected Mortality Count</label>
-            <input type="number" name="new_mortality" id="edit-new-mortality" class="form-input" min="0">
-        </div>
-        <div class="form-group" id="edit-sale-field" style="display:none;">
-            <label>Corrected Quantity Sold (trays)</label>
-            <input type="number" name="new_quantity" id="edit-new-quantity" class="form-input" min="0">
-        </div>
-
-        <div style="display:flex; gap:10px; margin-top:0.5rem;">
-            <button type="submit" class="btn-farm btn-orange" style="flex:1; padding:13px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>Send to Owner
-            </button>
-            <button type="button" class="btn-farm btn-dark" onclick="closeEditModal()"
-                    style="padding:13px; min-width:90px;">Cancel</button>
-        </div>
-    </form>
-</div>
-
-<!-- ── DELETE REQUEST MODAL ──────────────────────────────────── -->
-<div id="delete-overlay" onclick="closeDeleteModal()"
-     style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.72); z-index:999;"></div>
-
-<div id="delete-modal"
-     style="display:none; position:fixed; top:50%; left:50%;
-            transform:translate(-50%,-50%); z-index:1000;
-            width:min(460px,94vw);
-            background:var(--bg-soil); border:1px solid var(--border-mid);
-            border-top:4px solid var(--danger); border-radius:var(--radius-lg);
-            padding:1.6rem 1.8rem; box-shadow:var(--shadow-raised);">
-    <h3 style="color:var(--danger); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">
-        Request Deletion
-    </h3>
-    <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:1.4rem;">
-        The Owner must approve deletions. The record stays until then.
-    </p>
-    <form method="GET" action="request_delete.php">
-        <input type="hidden" name="type" id="delete-type">
-        <input type="hidden" name="id"   id="delete-id">
-
-        <div class="form-group">
-            <label>Reason for Deletion <span style="color:var(--danger);">*</span></label>
-            <select name="reason_preset" id="delete-reason-select" class="form-input" required
-                    onchange="toggleDeleteOther(this.value)">
-                <option value="" disabled selected>— Select a reason —</option>
-                <?php foreach ($delete_reasons as $r): ?>
-                <option value="<?php echo htmlspecialchars($r); ?>"><?php echo htmlspecialchars($r); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </div>
-        <div class="form-group" id="delete-other-group" style="display:none;">
-            <label>Please specify</label>
-            <textarea name="reason_other" class="form-input" rows="2" placeholder="Describe the issue…"></textarea>
-        </div>
-
-        <div style="display:flex; gap:10px; margin-top:0.5rem;">
-            <button type="submit" class="btn-farm btn-danger" style="flex:1; padding:13px;">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:5px;"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>Request Deletion
-            </button>
-            <button type="button" class="btn-farm btn-dark" onclick="closeDeleteModal()"
-                    style="padding:13px; min-width:90px;">Cancel</button>
-        </div>
-    </form>
-</div>
-
-<script>
-// ── Edit Modal ──────────────────────────────────────────────
-function openEditModal(type, id, currentVal) {
-    document.getElementById('edit-type').value = type;
-    document.getElementById('edit-id').value   = id;
-    document.getElementById('edit-reason-select').value = '';
-    document.getElementById('edit-other-group').style.display  = 'none';
-    document.getElementById('edit-harvest-field').style.display = 'none';
-    document.getElementById('edit-health-field').style.display  = 'none';
-    document.getElementById('edit-sale-field').style.display    = 'none';
-
-    if (type === 'Harvest') {
-        document.getElementById('edit-harvest-field').style.display = 'block';
-        document.getElementById('edit-new-total').value = currentVal;
-    } else if (type === 'Health') {
-        document.getElementById('edit-health-field').style.display = 'block';
-        document.getElementById('edit-new-mortality').value = currentVal;
-    } else if (type === 'Sale') {
-        document.getElementById('edit-sale-field').style.display = 'block';
-        document.getElementById('edit-new-quantity').value = currentVal;
-    }
-    document.getElementById('edit-overlay').style.display = 'block';
-    document.getElementById('edit-modal').style.display   = 'block';
-}
-function closeEditModal() {
-    document.getElementById('edit-overlay').style.display = 'none';
-    document.getElementById('edit-modal').style.display   = 'none';
-}
-function toggleEditOther(val) {
-    document.getElementById('edit-other-group').style.display =
-        val === 'Other (please specify)' ? 'block' : 'none';
-}
-
-// ── Delete Modal ─────────────────────────────────────────────
-function openDeleteModal(type, id) {
-    document.getElementById('delete-type').value = type;
-    document.getElementById('delete-id').value   = id;
-    document.getElementById('delete-reason-select').value = '';
-    document.getElementById('delete-other-group').style.display = 'none';
-    document.getElementById('delete-overlay').style.display = 'block';
-    document.getElementById('delete-modal').style.display   = 'block';
-}
-function closeDeleteModal() {
-    document.getElementById('delete-overlay').style.display = 'none';
-    document.getElementById('delete-modal').style.display   = 'none';
-}
-function toggleDeleteOther(val) {
-    document.getElementById('delete-other-group').style.display =
-        val === 'Other (please specify)' ? 'block' : 'none';
-}
-</script>
+<script>/* modals removed — edit/delete go directly to their pages */</script>
 
 <?php include('../includes/footer.php'); ?>

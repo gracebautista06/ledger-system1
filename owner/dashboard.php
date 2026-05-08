@@ -252,11 +252,11 @@ $js_rev_data = json_encode($rev_data);
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
             <a href="manage_inventory/inventory.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-               🥚 Active Stock
+                Active Stock
             </a>
             <a href="manage_inventory/inventory_history.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-               🗃️ Inventory History
+                Inventory History
             </a>
         </div>
 
@@ -268,11 +268,11 @@ $js_rev_data = json_encode($rev_data);
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
             <a href="manage_flocks/batches.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-               📦 Active Batches
+                Active Batches
             </a>
             <a href="manage_flocks/flock_history.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-               🗃️ Flock History
+                Flock History
             </a>
         </div>
 
@@ -284,15 +284,15 @@ $js_rev_data = json_encode($rev_data);
         <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
             <a href="manage_sales/view_sales.php"
                class="btn-farm btn-orange" style="text-align:center; font-size:0.85rem; padding:9px;">
-               💰 Today's Sales
+                Today's Sales
             </a>
              <a href="manage_sales/prices.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-               🏷️ Egg Pricing
+                Egg Pricing
             </a>
             <a href="manage_sales/sales_history.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-               🗃️ Sales History
+                Sales History
             </a>
         </div>
 
@@ -304,15 +304,15 @@ $js_rev_data = json_encode($rev_data);
         <div style="display:flex; flex-direction:column; gap:6px;">
             <a href="manage_inventory/data_management.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-               🗄️ Data Management
+                Data Management
             </a>
             <a href="manage_users/users.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-               👥 Farm Staff
+                Staff Management
             </a>
-            <a href="manage_users/activity_log.php"
+            <a href="reports.php"
                class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-               📜 Activity Log
+               Generate Report
             </a>
         </div>
 

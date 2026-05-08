@@ -25,7 +25,6 @@ if (isset($_SESSION['role'])) {
 
 // IMPROVEMENT: Define secret keys in one place.
 // In production, move these to a config.php outside the web root.
-define('KEY_STAFF', 'EGG_STAFF_2026');
 define('KEY_OWNER', 'FARM_BOSS_99');
 
 $errors  = [];
@@ -61,13 +60,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $errors[] = "Invalid role selected.";
     }
 
-    // Validate secret key against role
-    if (empty($errors)) {
-        $authorized = ($role === 'Staff' && $input_key === KEY_STAFF)
-                   || ($role === 'Owner' && $input_key === KEY_OWNER);
-
-        if (!$authorized) {
-            $errors[] = "🔒 Invalid secret key for the selected role. Access denied.";
+    // Validate secret key — only required for Owner
+    if (empty($errors) && $role === 'Owner') {
+        if ($input_key !== KEY_OWNER) {
+            $errors[] = "Invalid secret key for the selected role. Access denied.";
         }
     }
 
@@ -223,8 +219,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     </select>
                 </div>
 
-                <!-- SECRET KEY -->
-                <div class="form-group">
+                <!-- SECRET KEY (Owner only) -->
+                <div class="form-group" id="secret-key-group" style="display:none;">
                     <label>Secret Key</label>
 
                     <div class="password-wrapper">
@@ -233,7 +229,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                                name="secret_key"
                                class="form-input"
                                placeholder="Provided by admin"
-                               required>
+                               id="reg_key">
 
                         <button type="button"
                                 class="toggle-password"
@@ -308,7 +304,28 @@ function updateStrength(val) {
     label.style.color    = l.color;
 }
 
-// Live password match check
+// Show/hide secret key field based on role
+document.querySelector('select[name="role"]').addEventListener('change', function () {
+    const keyGroup = document.getElementById('secret-key-group');
+    const keyInput = document.querySelector('#secret-key-group input[name="secret_key"]');
+    const isOwner  = this.value === 'Owner';
+    keyGroup.style.display = isOwner ? 'block' : 'none';
+    keyInput.required      = isOwner;
+    if (!isOwner) keyInput.value = '';
+});
+
+// On page load: restore state if role was pre-selected (e.g. after validation error)
+(function () {
+    const role     = document.querySelector('select[name="role"]').value;
+    const keyGroup = document.getElementById('secret-key-group');
+    const keyInput = document.querySelector('#secret-key-group input[name="secret_key"]');
+    if (role === 'Owner') {
+        keyGroup.style.display = 'block';
+        keyInput.required      = true;
+    }
+})();
+
+
 document.getElementById('reg_password2').addEventListener('input', function () {
     const pw1 = document.getElementById('reg_password').value;
     const msg = document.getElementById('pw-match-msg');

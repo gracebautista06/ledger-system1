@@ -61,52 +61,40 @@ if ($batches_q) {
 }
 
 // ── Helper: get stock per size for a given batch_id ──────────
+// Returns available trays per size code (e.g. 'PW', 'S', 'M' …).
+// Stock = floor(harvested_eggs / 30) − trays_sold.
+// The qty_* columns in the sales table already store TRAY counts
+// (not eggs), so we read them as-is and never multiply/divide by 30.
 function get_batch_stock($conn, $batch_id, $harvest_cols, $sale_qty_cols) {
     $bid   = (int)$batch_id;
     $stock = [];
     $total = 0;
 
-    // Get arrival date for this batch (to scope sold eggs)
-    $arr_q   = $conn->query("SELECT COALESCE(arrival_date, date_acquired, '2000-01-01') AS arr FROM batches WHERE batch_id=$bid");
-    $arrival = $arr_q ? $arr_q->fetch_assoc()['arr'] : '2000-01-01';
-    $arr_esc = $conn->real_escape_string($arrival);
-
     // Eggs harvested per size for this batch
     $hq   = $conn->query("SELECT " . implode(', ', array_map(fn($c) => "COALESCE(SUM($c),0) AS $c", $harvest_cols)) . " FROM harvests WHERE batch_id=$bid");
     $harv = $hq ? $hq->fetch_assoc() : [];
 
-    // Total harvested eggs for this batch (for proportional sold split)
-    $htot_q  = $conn->query("SELECT COALESCE(SUM(total_eggs),0) AS t FROM harvests WHERE batch_id=$bid");
-    $harv_total = $htot_q ? (int)$htot_q->fetch_assoc()['t'] : 0;
-
-    // Total sold eggs since batch arrival (approximated to this batch)
-    // If sales has batch_id column use that, otherwise use arrival date scope
+    // Check once whether the sales table has a batch_id column
     $has_batch_col = $conn->query("SHOW COLUMNS FROM sales LIKE 'batch_id'")->num_rows > 0;
 
     if ($has_batch_col) {
+        // Exact: sales are tied directly to this batch
         $sold_q = $conn->query("SELECT " . implode(', ', array_map(fn($c) => "COALESCE(SUM($c),0) AS $c", $sale_qty_cols)) . " FROM sales WHERE batch_id=$bid");
     } else {
-        $sold_q = $conn->query("SELECT " . implode(', ', array_map(fn($c) => "COALESCE(SUM($c),0) AS $c", $sale_qty_cols)) . " FROM sales WHERE DATE(date_sold) >= '$arr_esc'");
+        // Fallback: scope by batch arrival date
+        $arr_q   = $conn->query("SELECT COALESCE(arrival_date, date_acquired, '2000-01-01') AS arr FROM batches WHERE batch_id=$bid");
+        $arrival = $arr_q ? ($arr_q->fetch_assoc()['arr'] ?? '2000-01-01') : '2000-01-01';
+        $arr_esc = $conn->real_escape_string($arrival);
+        $sold_q  = $conn->query("SELECT " . implode(', ', array_map(fn($c) => "COALESCE(SUM($c),0) AS $c", $sale_qty_cols)) . " FROM sales WHERE DATE(date_sold) >= '$arr_esc'");
     }
-    $sold_by_size = $sold_q ? $sold_q->fetch_assoc() : [];
+    // qty_* columns are TRAY counts — read them directly, no *30 needed
+    $sold_trays = $sold_q ? $sold_q->fetch_assoc() : [];
 
     foreach ($harvest_cols as $code => $hcol) {
-        $scol      = $sale_qty_cols[$code];
-        $eggs_h    = isset($harv[$hcol]) ? (int)$harv[$hcol] : 0;
-        $trays_h   = (int)floor($eggs_h / 30);
-
-        if ($has_batch_col) {
-            // Exact: sales linked to this batch
-            $sold_t = isset($sold_by_size[$scol]) ? (int)$sold_by_size[$scol] : 0;
-        } else {
-            // Proportional split of total sold by this size's harvest share
-            $total_sold_size = isset($sold_by_size[$scol]) ? (int)$sold_by_size[$scol] : 0;
-            if ($harv_total > 0 && $eggs_h > 0) {
-                $sold_t = (int)round(($eggs_h / $harv_total) * ($total_sold_size * 30) / 30);
-            } else {
-                $sold_t = $total_sold_size;
-            }
-        }
+        $scol    = $sale_qty_cols[$code];
+        $eggs_h  = isset($harv[$hcol]) ? (int)$harv[$hcol] : 0;
+        $trays_h = (int)floor($eggs_h / 30);          // eggs harvested → trays
+        $sold_t  = isset($sold_trays[$scol]) ? (int)$sold_trays[$scol] : 0; // already trays
 
         $avail        = max(0, $trays_h - $sold_t);
         $stock[$code] = $avail;
@@ -214,7 +202,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['submit_sale'])) {
                      payment_method, notes, qty_pw, qty_s, qty_m, qty_l, qty_xl, qty_j)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             ");
-            $ins->bind_param("iiisiddssiiiiii",
+            $ins->bind_param("iisiddssiiiiii",
                 $staff_id, $post_batch_id, $customer, $total_trays, $unit_price, $total_amount,
                 $payment_method, $notes,
                 $qty['PW'], $qty['S'], $qty['M'], $qty['L'], $qty['XL'], $qty['J']
