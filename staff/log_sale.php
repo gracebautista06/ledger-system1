@@ -34,6 +34,7 @@ $size_colors = [
     'PW' => '#adb5bd', 'S' => '#74c0fc', 'M' => '#51cf66',
     'L'  => '#fcc419', 'XL'=> '#ff922b', 'J' => '#f03e3e',
 ];
+// Whitelisted column maps — used in get_batch_stock() to prevent column injection
 $harvest_cols = [
     'PW' => 'size_pw', 'S' => 'size_s', 'M' => 'size_m',
     'L'  => 'size_l',  'XL'=> 'size_xl','J' => 'size_j',
@@ -43,9 +44,12 @@ $sale_qty_cols = [
     'L'  => 'qty_l',  'XL'=> 'qty_xl','J' => 'qty_j',
 ];
 
+// ── Allowed column whitelists for get_batch_stock() ───────────
+// FIX #2: validate column names before interpolating into queries
+$allowed_harvest_cols  = ['size_pw','size_s','size_m','size_l','size_xl','size_j'];
+$allowed_sale_qty_cols = ['qty_pw','qty_s','qty_m','qty_l','qty_xl','qty_j'];
+
 // ── Load available coops/batches (all active) ─────────────────
-// Show all active coops in the dropdown regardless of whether
-// harvests have been logged yet. Stock will show 0 if none logged.
 $batches_q = $conn->query("
     SELECT b.batch_id, b.breed, b.coop_number, b.coop_label
     FROM batches b
@@ -53,7 +57,6 @@ $batches_q = $conn->query("
     ORDER BY b.coop_number ASC, b.batch_id ASC
 ");
 $available_batches = [];
-$available_breeds  = []; // kept for JS stock map keyed by batch_id
 if ($batches_q) {
     while ($row = $batches_q->fetch_assoc()) {
         $available_batches[] = $row;
@@ -63,38 +66,33 @@ if ($batches_q) {
 // ── Helper: get stock per size for a given batch_id ──────────
 // Returns available trays per size code (e.g. 'PW', 'S', 'M' …).
 // Stock = floor(harvested_eggs / 30) − trays_sold.
-// The qty_* columns in the sales table already store TRAY counts
-// (not eggs), so we read them as-is and never multiply/divide by 30.
+// qty_* in sales already stores TRAY counts — read directly, no ×30 needed.
 function get_batch_stock($conn, $batch_id, $harvest_cols, $sale_qty_cols) {
+    // FIX #2: whitelist column names before interpolating into raw queries
+    $allowed_h = ['size_pw','size_s','size_m','size_l','size_xl','size_j'];
+    $allowed_s = ['qty_pw','qty_s','qty_m','qty_l','qty_xl','qty_j'];
+    foreach ($harvest_cols  as $c) { if (!in_array($c, $allowed_h, true)) return ['per_size' => [], 'total' => 0]; }
+    foreach ($sale_qty_cols as $c) { if (!in_array($c, $allowed_s, true)) return ['per_size' => [], 'total' => 0]; }
+
     $bid   = (int)$batch_id;
     $stock = [];
     $total = 0;
 
     // Eggs harvested per size for this batch
-    $hq   = $conn->query("SELECT " . implode(', ', array_map(fn($c) => "COALESCE(SUM($c),0) AS $c", $harvest_cols)) . " FROM harvests WHERE batch_id=$bid");
+    $h_select = implode(', ', array_map(fn($c) => "COALESCE(SUM(`$c`),0) AS `$c`", $harvest_cols));
+    $hq   = $conn->query("SELECT $h_select FROM harvests WHERE batch_id=$bid");
     $harv = $hq ? $hq->fetch_assoc() : [];
 
-    // Check once whether the sales table has a batch_id column
-    $has_batch_col = $conn->query("SHOW COLUMNS FROM sales LIKE 'batch_id'")->num_rows > 0;
-
-    if ($has_batch_col) {
-        // Exact: sales are tied directly to this batch
-        $sold_q = $conn->query("SELECT " . implode(', ', array_map(fn($c) => "COALESCE(SUM($c),0) AS $c", $sale_qty_cols)) . " FROM sales WHERE batch_id=$bid");
-    } else {
-        // Fallback: scope by batch arrival date
-        $arr_q   = $conn->query("SELECT COALESCE(arrival_date, date_acquired, '2000-01-01') AS arr FROM batches WHERE batch_id=$bid");
-        $arrival = $arr_q ? ($arr_q->fetch_assoc()['arr'] ?? '2000-01-01') : '2000-01-01';
-        $arr_esc = $conn->real_escape_string($arrival);
-        $sold_q  = $conn->query("SELECT " . implode(', ', array_map(fn($c) => "COALESCE(SUM($c),0) AS $c", $sale_qty_cols)) . " FROM sales WHERE DATE(date_sold) >= '$arr_esc'");
-    }
-    // qty_* columns are TRAY counts — read them directly, no *30 needed
+    // FIX #1: batch_id column is confirmed to exist — removed SHOW COLUMNS check
+    $s_select = implode(', ', array_map(fn($c) => "COALESCE(SUM(`$c`),0) AS `$c`", $sale_qty_cols));
+    $sold_q   = $conn->query("SELECT $s_select FROM sales WHERE batch_id=$bid");
     $sold_trays = $sold_q ? $sold_q->fetch_assoc() : [];
 
     foreach ($harvest_cols as $code => $hcol) {
         $scol    = $sale_qty_cols[$code];
-        $eggs_h  = isset($harv[$hcol]) ? (int)$harv[$hcol] : 0;
-        $trays_h = (int)floor($eggs_h / 30);          // eggs harvested → trays
-        $sold_t  = isset($sold_trays[$scol]) ? (int)$sold_trays[$scol] : 0; // already trays
+        $eggs_h  = isset($harv[$hcol])       ? (int)$harv[$hcol]       : 0;
+        $trays_h = (int)floor($eggs_h / 30);  // eggs harvested → trays
+        $sold_t  = isset($sold_trays[$scol])  ? (int)$sold_trays[$scol] : 0; // already trays
 
         $avail        = max(0, $trays_h - $sold_t);
         $stock[$code] = $avail;
@@ -102,15 +100,83 @@ function get_batch_stock($conn, $batch_id, $harvest_cols, $sale_qty_cols) {
     }
     return ['per_size' => $stock, 'total' => $total];
 }
-// Backward-compat alias used in old inline calls
-function get_breed_stock($conn, $breed, $harvest_cols, $sale_qty_cols) {
-    // Not used for stock calculation anymore — returns empty
-    return ['per_size' => array_fill_keys(array_keys($harvest_cols), 0), 'total' => 0];
+
+// ── Build JS stock map from TWO aggregate queries (not N×2) ───
+// FIX #7: replace per-batch query loop with two bulk GROUP BY queries
+$js_stock = [];
+$js_breed = [];
+$js_label = [];
+
+// Pre-index available batches by batch_id for O(1) lookup
+$batch_index = [];
+foreach ($available_batches as $ab) {
+    $batch_index[(int)$ab['batch_id']] = $ab;
+}
+
+if (!empty($available_batches)) {
+    // All harvested eggs per batch per size in one query
+    $bulk_h = $conn->query("
+        SELECT batch_id,
+               COALESCE(SUM(size_pw),0) AS size_pw, COALESCE(SUM(size_s),0)  AS size_s,
+               COALESCE(SUM(size_m),0)  AS size_m,  COALESCE(SUM(size_l),0)  AS size_l,
+               COALESCE(SUM(size_xl),0) AS size_xl, COALESCE(SUM(size_j),0)  AS size_j
+        FROM harvests
+        GROUP BY batch_id
+    ");
+    $harv_map = [];
+    if ($bulk_h) {
+        while ($r = $bulk_h->fetch_assoc()) {
+            $harv_map[(int)$r['batch_id']] = $r;
+        }
+    }
+
+    // All sold trays per batch per size in one query
+    $bulk_s = $conn->query("
+        SELECT batch_id,
+               COALESCE(SUM(qty_pw),0) AS qty_pw, COALESCE(SUM(qty_s),0)  AS qty_s,
+               COALESCE(SUM(qty_m),0)  AS qty_m,  COALESCE(SUM(qty_l),0)  AS qty_l,
+               COALESCE(SUM(qty_xl),0) AS qty_xl, COALESCE(SUM(qty_j),0)  AS qty_j
+        FROM sales
+        WHERE batch_id IS NOT NULL
+        GROUP BY batch_id
+    ");
+    $sold_map = [];
+    if ($bulk_s) {
+        while ($r = $bulk_s->fetch_assoc()) {
+            $sold_map[(int)$r['batch_id']] = $r;
+        }
+    }
+
+    foreach ($available_batches as $ab) {
+        $bid  = (int)$ab['batch_id'];
+        $harv = $harv_map[$bid] ?? [];
+        $sold = $sold_map[$bid] ?? [];
+
+        $per_size = [];
+        foreach ($harvest_cols as $code => $hcol) {
+            $scol        = $sale_qty_cols[$code];
+            $eggs_h      = isset($harv[$hcol]) ? (int)$harv[$hcol] : 0;
+            $trays_h     = (int)floor($eggs_h / 30);
+            $sold_t      = isset($sold[$scol])  ? (int)$sold[$scol]  : 0;
+            $per_size[$code] = max(0, $trays_h - $sold_t);
+        }
+
+        $js_stock[(string)$bid] = $per_size;
+        $js_breed[(string)$bid] = $ab['breed'];
+
+        if (!empty($ab['coop_label'])) {
+            $js_label[(string)$bid] = $ab['coop_label'] . ' — ' . $ab['breed'];
+        } elseif (!empty($ab['coop_number'])) {
+            $js_label[(string)$bid] = 'Coop ' . $ab['coop_number'] . ' — ' . $ab['breed'];
+        } else {
+            $js_label[(string)$bid] = 'Batch #' . $bid . ' — ' . $ab['breed'];
+        }
+    }
 }
 
 // ── Load prices for all breeds (for JS) ──────────────────────
 $all_prices_q = $conn->query("SELECT breed, size_code, price_per_tray FROM breed_prices");
-$all_prices   = []; // $all_prices[$breed][$code] = price_per_tray
+$all_prices   = [];
 if ($all_prices_q) {
     while ($row = $all_prices_q->fetch_assoc()) {
         $all_prices[$row['breed']][$row['size_code']] = (float)$row['price_per_tray'];
@@ -125,15 +191,15 @@ foreach ($available_batches as $ab) {
 }
 if (!$selected_batch) { $selected_batch_id = 0; }
 
-// Load stock for selected batch
+// Load stock for selected batch (uses the two-query map already built above)
 $batch_stock  = [];
 $total_avail  = 0;
 $breed_prices = [];
 
 if ($selected_batch) {
-    $bs           = get_batch_stock($conn, $selected_batch_id, $harvest_cols, $sale_qty_cols);
-    $batch_stock  = $bs['per_size'];
-    $total_avail  = $bs['total'];
+    $bid_str      = (string)$selected_batch_id;
+    $batch_stock  = $js_stock[$bid_str] ?? [];
+    $total_avail  = array_sum($batch_stock);
     $breed_prices = $all_prices[$selected_batch['breed']] ?? [];
 }
 
@@ -167,16 +233,19 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['submit_sale'])) {
     $total_amount = round($total_amount, 2);
     $unit_price   = $total_trays > 0 ? round($total_amount / $total_trays, 2) : 0;
 
-    // ── Server-side stock validation ──────────────────────────
+    // ── Server-side validation ────────────────────────────────
     $stock_errors = [];
     if (empty($post_batch_id) || !$batch_info) {
         $stock_errors[] = "Please select a coop / batch.";
     } elseif (empty($customer)) {
         $stock_errors[] = "Please enter the customer name.";
+    // FIX #11: enforce customer_name varchar(150) length server-side
+    } elseif (mb_strlen($customer) > 150) {
+        $stock_errors[] = "Customer name must be 150 characters or fewer.";
     } elseif ($total_trays <= 0) {
         $stock_errors[] = "Please enter at least one tray quantity.";
     } else {
-        // Re-fetch stock for validation
+        // Re-fetch stock live at submission time for race-condition safety
         $val_stock = get_batch_stock($conn, $post_batch_id, $harvest_cols, $sale_qty_cols);
         foreach ($size_defs as $code => $label) {
             if ($qty[$code] <= 0) continue;
@@ -187,39 +256,29 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['submit_sale'])) {
         }
     }
 
-    if (!empty($stock_errors)) {
-        $message = "<div class='alert error'>⚠️ " . implode('<br>', $stock_errors) . "</div>";
-    } elseif ($total_amount <= 0 && !empty($breed_p)) {
-        $message = "<div class='alert error'>⚠️ Total is zero. Ask the Owner to set prices for <strong>" . htmlspecialchars($breed) . "</strong> in Pricing Settings.</div>";
-    } else {
-        // Check if sales table has batch_id column
-        $has_batch_col = $conn->query("SHOW COLUMNS FROM sales LIKE 'batch_id'")->num_rows > 0;
+    $warn_icon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px;margin-right:6px;flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
 
-        if ($has_batch_col) {
-            $ins = $conn->prepare("
-                INSERT INTO sales
-                    (staff_id, batch_id, customer_name, quantity_sold, unit_price, total_amount,
-                     payment_method, notes, qty_pw, qty_s, qty_m, qty_l, qty_xl, qty_j)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ");
-            $ins->bind_param("iisiddssiiiiii",
-                $staff_id, $post_batch_id, $customer, $total_trays, $unit_price, $total_amount,
-                $payment_method, $notes,
-                $qty['PW'], $qty['S'], $qty['M'], $qty['L'], $qty['XL'], $qty['J']
-            );
-        } else {
-            $ins = $conn->prepare("
-                INSERT INTO sales
-                    (staff_id, customer_name, quantity_sold, unit_price, total_amount,
-                     payment_method, notes, qty_pw, qty_s, qty_m, qty_l, qty_xl, qty_j)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
-            ");
-            $ins->bind_param("isiddssiiiiii",
-                $staff_id, $customer, $total_trays, $unit_price, $total_amount,
-                $payment_method, $notes,
-                $qty['PW'], $qty['S'], $qty['M'], $qty['L'], $qty['XL'], $qty['J']
-            );
-        }
+    if (!empty($stock_errors)) {
+        $message = "<div class='alert error'>{$warn_icon}" . implode('<br>', $stock_errors) . "</div>";
+    } elseif ($total_amount <= 0) {
+        $breed_safe = htmlspecialchars($breed);
+        $no_price_msg = empty($breed_p)
+            ? "No prices have been set for &quot;{$breed_safe}&quot; yet. Ask the Owner to configure pricing before logging a sale."
+            : "Total is zero. Ask the Owner to set prices for &quot;{$breed_safe}&quot; in Pricing Settings.";
+        $message = "<div class='alert error'>{$warn_icon}{$no_price_msg}</div>";
+    } else {
+        // FIX #1: batch_id column confirmed — removed SHOW COLUMNS check, single INSERT path
+        $ins = $conn->prepare("
+            INSERT INTO sales
+                (staff_id, batch_id, customer_name, quantity_sold, unit_price, total_amount,
+                 payment_method, notes, qty_pw, qty_s, qty_m, qty_l, qty_xl, qty_j)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ");
+        $ins->bind_param("iisiddssiiiiii",
+            $staff_id, $post_batch_id, $customer, $total_trays, $unit_price, $total_amount,
+            $payment_method, $notes,
+            $qty['PW'], $qty['S'], $qty['M'], $qty['L'], $qty['XL'], $qty['J']
+        );
 
         if ($ins->execute()) {
             $sale_id = $conn->insert_id;
@@ -228,28 +287,23 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && isset($_POST['submit_sale'])) {
             log_activity($conn, $staff_id, 'Staff', 'Sale Added',
                 "Sold {$total_trays} tray(s) [{$breed}] to {$customer} — ₱" . number_format($total_amount, 2) . " (Sale #{$sale_id}, Batch #{$post_batch_id})");
 
-            // Old-stock notification check — resolve if this batch is now sold out
-            $notif_q = $conn->query("SELECT n.*, b.arrival_date FROM notifications n JOIN batches b ON n.batch_id=b.batch_id WHERE n.batch_id=$post_batch_id AND n.status IN ('unread','read') ORDER BY n.created_at DESC LIMIT 1");
+            // FIX #4: use get_batch_stock() for sold-out check — same calc path as everywhere else.
+            // FIX #3: removed broken fallback prepared statement path entirely.
+            // FIX #5: removed b.arrival_date from JOIN — no longer referenced.
+            $notif_q = $conn->query("
+                SELECT n.notif_id
+                FROM notifications n
+                WHERE n.batch_id = $post_batch_id
+                  AND n.status IN ('unread','read')
+                ORDER BY n.created_at DESC
+                LIMIT 1
+            ");
             if ($notif_q && $notif_q->num_rows > 0) {
-                $notif    = $notif_q->fetch_assoc();
-                $notif_id = (int)$notif['notif_id'];
-                $bid      = $post_batch_id;
-                $h_s = $conn->prepare("SELECT COALESCE(SUM(total_eggs),0) AS t FROM harvests WHERE batch_id=?");
-                $h_s->bind_param("i",$bid); $h_s->execute();
-                $harv_c = (int)$h_s->get_result()->fetch_assoc()['t']; $h_s->close();
-
-                $has_batch_col2 = $conn->query("SHOW COLUMNS FROM sales LIKE 'batch_id'")->num_rows > 0;
-                if ($has_batch_col2) {
-                    $s_s = $conn->prepare("SELECT COALESCE(SUM(quantity_sold*30),0) AS t FROM sales WHERE batch_id=?");
-                } else {
-                    $arr_d = $notif['arrival_date'] ?? '2000-01-01';
-                    $s_s   = $conn->prepare("SELECT COALESCE(SUM(quantity_sold*30),0) AS t FROM sales WHERE date_sold>='$arr_d'");
-                    // bind_param below still expects one arg; re-bind with dummy
-                }
-                $s_s->bind_param("i",$bid); $s_s->execute();
-                $sold_c = (int)$s_s->get_result()->fetch_assoc()['t']; $s_s->close();
-                if (max(0,$harv_c-$sold_c)<=0) {
-                    $conn->query("UPDATE notifications SET status='completed',completed_at=NOW() WHERE notif_id=$notif_id");
+                $notif_id  = (int)$notif_q->fetch_assoc()['notif_id'];
+                $remaining = get_batch_stock($conn, $post_batch_id, $harvest_cols, $sale_qty_cols);
+                if ($remaining['total'] <= 0) {
+                    $conn->query("UPDATE notifications SET status='completed', completed_at=NOW()
+                                  WHERE notif_id=" . $notif_id);
                 }
             }
 
@@ -270,12 +324,25 @@ foreach ($size_defs as $code => $_) {
 }
 
 $has_any_stock = !empty($available_batches);
+
+// FIX #17: build stock-breed-label correctly, mirroring JS logic
+$stock_breed_label = '';
+if ($selected_batch) {
+    if (!empty($selected_batch['coop_label'])) {
+        $stock_breed_label = $selected_batch['coop_label'];
+    } elseif (!empty($selected_batch['coop_number'])) {
+        $stock_breed_label = 'Coop ' . $selected_batch['coop_number'];
+    } else {
+        $stock_breed_label = 'Batch #' . $selected_batch['batch_id'];
+    }
+    $stock_breed_label .= ' — ' . $selected_batch['breed'];
+}
 ?>
 
 <div class="card" style="max-width:720px; margin:2rem auto; border-top:5px solid var(--success);">
 
     <h2 style="color:var(--gold); font-family:'Playfair Display',serif; margin-bottom:0.3rem;">
-         Record New Sale
+        Record New Sale
     </h2>
     <p style="color:var(--text-muted); margin-bottom:1.6rem; font-size:0.88rem;">
         Select the coop, then enter trays sold per size. Prices load automatically.
@@ -287,13 +354,12 @@ $has_any_stock = !empty($available_batches);
     <div style="background:var(--danger-bg); border:1px solid rgba(194,58,58,0.4);
                 border-left:5px solid var(--danger); border-radius:var(--radius);
                 padding:20px 24px; text-align:center;">
-        <div style="font-size:2rem; margin-bottom:10px;"></div>
         <div style="font-size:1rem; font-weight:700; color:var(--text-primary); margin-bottom:6px;">No Active Coops</div>
+        <!-- FIX #14: removed link to owner/manage_batches.php — staff cannot access owner pages -->
         <div style="font-size:0.88rem; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;">
-            No active batches found. Add a batch in Manage Batches before recording a sale.
+            No active batches found. Please ask the Owner to add a batch before recording a sale.
         </div>
-        <a href="../owner/manage_batches.php" class="btn-farm btn-orange" style="margin-right:10px;">🐔 Manage Batches</a>
-        <a href="dashboard.php" class="btn-farm btn-dark">← Back</a>
+        <a href="dashboard.php" class="btn-farm btn-dark">← Back to Dashboard</a>
     </div>
 
     <?php else: ?>
@@ -309,7 +375,6 @@ $has_any_stock = !empty($available_batches);
                         onchange="onBatchChange(this.value)" required>
                     <option value="">— Select coop —</option>
                     <?php foreach ($available_batches as $ab):
-                        // Build display: "Coop 1 — ISA Brown" or "Main Coop — ISA Brown"
                         if (!empty($ab['coop_label'])) {
                             $coop_display = $ab['coop_label'];
                         } elseif (!empty($ab['coop_number'])) {
@@ -319,9 +384,9 @@ $has_any_stock = !empty($available_batches);
                         }
                         $option_text = $coop_display . ' — ' . $ab['breed'];
                     ?>
-                        <option value="<?php echo $ab['batch_id']; ?>"
+                        <option value="<?php echo (int)$ab['batch_id']; ?>"
                             <?php echo $selected_batch_id == $ab['batch_id'] ? 'selected' : ''; ?>>
-                            <?php echo htmlspecialchars($option_text); ?>
+                            <?php echo htmlspecialchars($option_text, ENT_QUOTES, 'UTF-8'); ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -329,8 +394,9 @@ $has_any_stock = !empty($available_batches);
             <div class="form-group" style="margin:0;">
                 <label>Customer Name <span style="color:var(--danger);">*</span></label>
                 <input type="text" name="customer_name" class="form-input"
-                       placeholder="Customer or business name" required
-                       value="<?php echo isset($_POST['customer_name']) ? htmlspecialchars(trim($_POST['customer_name'])) : ''; ?>">
+                       placeholder="Customer or business name"
+                       maxlength="150" required
+                       value="<?php echo isset($_POST['customer_name']) ? htmlspecialchars(trim($_POST['customer_name']), ENT_QUOTES, 'UTF-8') : ''; ?>">
             </div>
         </div>
 
@@ -341,7 +407,9 @@ $has_any_stock = !empty($available_batches);
                                         margin-bottom:1.2rem;">
             <div style="font-size:0.68rem; font-weight:700; color:var(--text-muted);
                         text-transform:uppercase; letter-spacing:0.8px; margin-bottom:8px;">
-                 Available Stock — <span id="stock-breed-label"><?php echo htmlspecialchars($selected_batch ? $selected_batch['coop_label'] . ' — ' . $selected_batch['breed'] : ''); ?></span>
+                Available Stock —
+                <!-- FIX #17: label built server-side with same logic as JS -->
+                <span id="stock-breed-label"><?php echo htmlspecialchars($stock_breed_label, ENT_QUOTES, 'UTF-8'); ?></span>
             </div>
             <div style="display:flex; flex-wrap:wrap; gap:7px;" id="stock-boxes">
                 <?php foreach ($size_defs as $code => $label):
@@ -443,13 +511,11 @@ $has_any_stock = !empty($available_batches);
                         </div>
                     </div>
 
-                    <!-- FIX: avail_disp_ span always rendered so JS can update it.
-                         JS controls the None badge via data-out attribute. -->
                     <div style="text-align:center;">
                         <span id="avail_disp_<?php echo $code; ?>"
                               style="font-size:0.85rem; font-weight:700;
                                      color:<?php echo $is_out ? 'var(--text-muted)' : ($avail <= 5 ? 'var(--warning)' : 'var(--success)'); ?>;">
-                            <?php echo $is_out ? '0' : $avail; ?>
+                            <?php echo $avail; ?>
                         </span>
                         <div id="avail_label_<?php echo $code; ?>"
                              style="font-size:0.62rem; color:var(--text-muted);">
@@ -493,23 +559,25 @@ $has_any_stock = !empty($available_batches);
         <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:1.2rem;">
             <div class="form-group" style="margin:0;">
                 <label>Payment Method</label>
+                <!-- FIX #13: removed leading space from option text -->
                 <select name="payment_method" class="form-input">
-                    <option value="Cash"> Cash</option>
-                    <option value="GCash"> GCash</option>
-                    <option value="Bank Transfer"> Bank Transfer</option>
+                    <option value="Cash">Cash</option>
+                    <option value="GCash">GCash</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
                 </select>
             </div>
             <div class="form-group" style="margin:0;">
                 <label>Notes</label>
                 <input type="text" name="notes" class="form-input"
                        placeholder="Optional: bulk order, delivery, etc."
-                       value="<?php echo isset($_POST['notes']) ? htmlspecialchars($_POST['notes']) : ''; ?>">
+                       value="<?php echo isset($_POST['notes']) ? htmlspecialchars($_POST['notes'], ENT_QUOTES, 'UTF-8') : ''; ?>">
             </div>
         </div>
 
+        <!-- FIX #15: wrap button label in <span> so JS can update text without wiping the SVG icon -->
         <button type="submit" id="submitBtn" class="btn-farm btn-green btn-full"
                 style="padding:15px; font-size:1rem;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Record Sale
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg><span id="submitLabel">Record Sale</span>
         </button>
         <a href="dashboard.php" id="backBtn" class="back-link"
            style="display:block; text-align:center; margin-top:1rem;">
@@ -523,33 +591,11 @@ $has_any_stock = !empty($available_batches);
 // All prices from PHP, keyed by breed → size_code → price_per_tray
 const ALL_PRICES = <?php echo json_encode($all_prices); ?>;
 
-// All stock from PHP, keyed by batch_id (string) → size_code → available_trays
-const ALL_STOCK = <?php
-    $js_stock = [];
-    $js_breed = []; // batch_id → breed (for price lookup)
-    foreach ($available_batches as $ab) {
-        $bid  = (string)$ab['batch_id'];
-        $bs   = get_batch_stock($conn, $ab['batch_id'], $harvest_cols, $sale_qty_cols);
-        $js_stock[$bid] = $bs['per_size'];
-        $js_breed[$bid] = $ab['breed'];
-        // Build display label same logic as dropdown
-        if (!empty($ab['coop_label'])) {
-            $js_label[$bid] = $ab['coop_label'] . ' — ' . $ab['breed'];
-        } elseif (!empty($ab['coop_number'])) {
-            $js_label[$bid] = 'Coop ' . $ab['coop_number'] . ' — ' . $ab['breed'];
-        } else {
-            $js_label[$bid] = 'Batch #' . $ab['batch_id'] . ' — ' . $ab['breed'];
-        }
-    }
-    echo json_encode($js_stock);
-?>;
-
-// batch_id → breed name (for price lookup)
+// FIX #7: stock map built from two bulk queries in PHP — no per-batch query loop
+const ALL_STOCK  = <?php echo json_encode($js_stock); ?>;
 const BATCH_BREED = <?php echo json_encode($js_breed); ?>;
-// batch_id → display label (for stock summary header)
-const BATCH_LABEL = <?php echo json_encode($js_label ?? []); ?>;
-
-const SIZE_CODES = <?php echo json_encode(array_keys($size_defs)); ?>;
+const BATCH_LABEL = <?php echo json_encode($js_label); ?>;
+const SIZE_CODES  = <?php echo json_encode(array_keys($size_defs)); ?>;
 
 function onBatchChange(batchId) {
     const stockWrap  = document.getElementById('stock-summary');
@@ -573,18 +619,15 @@ function onBatchChange(batchId) {
     const prices = ALL_PRICES[breed]    || {};
     const stock  = ALL_STOCK[batchId]   || {};
 
-    // Update each size row
     document.querySelectorAll('.size-row').forEach(row => {
         const code  = row.dataset.code;
         const price = prices[code] || 0;
         const avail = stock[code]  !== undefined ? stock[code] : 0;
         const isOut = avail === 0;
 
-        // Update data attributes for recalc()
         row.dataset.price = price;
         row.dataset.max   = avail;
 
-        // Update price display
         const priceEl = document.getElementById('price_disp_' + code);
         if (priceEl) {
             priceEl.innerHTML = price > 0
@@ -609,7 +652,6 @@ function onBatchChange(batchId) {
             stockboxEl.style.color = avail > 0 ? 'var(--text-primary)' : 'var(--text-muted)';
         }
 
-        // Update input
         const input = row.querySelector('.size-qty');
         if (input) {
             input.max      = avail;
@@ -620,7 +662,6 @@ function onBatchChange(batchId) {
             input.style.background = isOut ? 'var(--bg-plank)' : '';
         }
 
-        // Reset subtotal
         const subEl = document.getElementById('sub_' + code);
         if (subEl) { subEl.textContent = '—'; subEl.style.color = 'var(--text-muted)'; }
 
@@ -663,17 +704,21 @@ function recalc() {
         }
     });
 
-    const tEl = document.getElementById('total_trays_display');
-    const gEl = document.getElementById('grand_total_display');
-    const btn = document.getElementById('submitBtn');
+    const tEl   = document.getElementById('total_trays_display');
+    const gEl   = document.getElementById('grand_total_display');
+    const btn   = document.getElementById('submitBtn');
+    // FIX #15: update only the <span> label, preserving the SVG icon
+    const label = document.getElementById('submitLabel');
 
     if (tEl) tEl.textContent = totalTrays + ' tray' + (totalTrays !== 1 ? 's' : '');
     if (gEl) gEl.textContent = '₱ ' + grandTotal.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     if (btn) {
-        btn.disabled       = hasOverLimit;
-        btn.style.opacity  = hasOverLimit ? '0.45' : '1';
-        btn.style.cursor   = hasOverLimit ? 'not-allowed' : '';
-        btn.textContent    = hasOverLimit ? 'Quantities exceed available stock' : 'Record Sale';
+        btn.disabled      = hasOverLimit;
+        btn.style.opacity = hasOverLimit ? '0.45' : '1';
+        btn.style.cursor  = hasOverLimit ? 'not-allowed' : '';
+    }
+    if (label) {
+        label.textContent = hasOverLimit ? 'Quantities exceed available stock' : 'Record Sale';
     }
 }
 
@@ -681,7 +726,16 @@ let isDirty = false;
 const sf = document.getElementById('saleForm');
 if (sf) {
     sf.addEventListener('input',  () => isDirty = true);
-    sf.addEventListener('submit', () => isDirty = false);
+
+    // FIX #16: disable submit on success to prevent double-submission
+    sf.addEventListener('submit', function () {
+        isDirty = false;
+        const btn   = document.getElementById('submitBtn');
+        const label = document.getElementById('submitLabel');
+        if (btn)   { btn.disabled = true; btn.style.opacity = '0.6'; }
+        if (label) { label.textContent = 'Saving…'; }
+    });
+
     window.addEventListener('beforeunload', e => { if (isDirty) { e.preventDefault(); e.returnValue=''; } });
     const bb = document.getElementById('backBtn');
     if (bb) bb.addEventListener('click', e => { if (isDirty && !confirm("Discard unsaved sale data?")) e.preventDefault(); });

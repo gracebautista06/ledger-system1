@@ -26,6 +26,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $j   = max(0, (int) ($_POST['size_j']  ?? 0));
     $notes = trim($_POST['notes'] ?? '');
 
+    // FIX #11: cap each size to a sane maximum to catch fat-finger entries
+    $max_per_size = 9999;
+    $pw = min($pw, $max_per_size);
+    $s  = min($s,  $max_per_size);
+    $m  = min($m,  $max_per_size);
+    $l  = min($l,  $max_per_size);
+    $xl = min($xl, $max_per_size);
+    $j  = min($j,  $max_per_size);
+
     $calculated_total = $pw + $s + $m + $l + $xl + $j;
 
     $check = $conn->prepare("SELECT batch_id FROM batches WHERE batch_id=? AND status='Active' LIMIT 1");
@@ -36,23 +45,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $check->close();
 
     if (!$valid_batch) {
-        $message = "<div class='alert error'> Invalid batch selected. Please choose an active batch.</div>";
+        // FIX #9: use Tabler icon instead of leading space character
+        $message = "<div class='alert error'><i class='ti ti-alert-circle' style='margin-right:6px;vertical-align:-2px;'></i>Invalid batch selected. Please choose an active batch.</div>";
     } elseif ($calculated_total === 0) {
-        $message = "<div class='alert error'> Please enter at least one egg count before submitting.</div>";
+        $message = "<div class='alert error'><i class='ti ti-alert-circle' style='margin-right:6px;vertical-align:-2px;'></i>Please enter at least one egg count before submitting.</div>";
     } else {
         $ins = $conn->prepare("INSERT INTO harvests (staff_id, batch_id, total_eggs, size_pw, size_s, size_m, size_l, size_xl, size_j, notes) VALUES (?,?,?,?,?,?,?,?,?,?)");
         $ins->bind_param("iiiiiiiiss", $staff_id, $batch_id, $calculated_total, $pw, $s, $m, $l, $xl, $j, $notes);
+        // FIX #4: clean single close() path — no duplicate close risk
         if ($ins->execute()) {
             $harvest_id = $conn->insert_id;
             $ins->close();
-            // Log activity
             log_activity($conn, $staff_id, 'Staff', 'Harvest Added',
                 "Logged {$calculated_total} eggs for Batch #{$batch_id} (Harvest #{$harvest_id})");
-            header("Location: view_logs.php?harvest_saved=1"); exit();
-        } else {
-            $message = "<div class='alert error'>Database error. Please try again.</div>";
+            header("Location: view_logs.php?harvest_saved=1");
+            exit();
         }
         $ins->close();
+        $message = "<div class='alert error'><i class='ti ti-alert-circle' style='margin-right:6px;vertical-align:-2px;'></i>Database error. Please try again.</div>";
     }
 }
 ?>
@@ -72,7 +82,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <?php
                 if ($batch_query && $batch_query->num_rows > 0) {
                     while ($b = $batch_query->fetch_assoc()) {
-                        echo "<option value='{$b['batch_id']}'>Batch #{$b['batch_id']} ({$b['breed']})</option>";
+                        // FIX #6: escape breed (varchar) to prevent XSS
+                        echo "<option value='" . (int)$b['batch_id'] . "'>"
+                           . "Batch #" . (int)$b['batch_id']
+                           . " (" . htmlspecialchars($b['breed'], ENT_QUOTES, 'UTF-8') . ")"
+                           . "</option>";
                     }
                 } else {
                     echo "<option disabled>No active batches</option>";
@@ -92,7 +106,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 foreach ($sizes as $name => $label): ?>
                 <div class="form-group" style="margin-bottom:0;">
                     <label><?php echo $label; ?></label>
-                    <input type="number" name="<?php echo $name; ?>" class="form-input egg-count" value="0" min="0" required>
+                    <!-- FIX #10: blank placeholder so staff types rather than clears;
+                         FIX #11: max="9999" to cap fat-finger input -->
+                    <input type="number" name="<?php echo $name; ?>"
+                           class="form-input egg-count"
+                           value="" placeholder="0"
+                           min="0" max="9999" required>
                 </div>
                 <?php endforeach; ?>
             </div>
@@ -111,8 +130,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <textarea name="notes" id="notes" class="form-input" rows="2" placeholder="Cracked eggs, observations, issues…"></textarea>
         </div>
 
-        <button type="submit" class="btn-farm btn-full" style="padding:16px; font-size:1rem;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Submit Harvest
+        <button type="submit" id="submitBtn" class="btn-farm btn-full" style="padding:16px; font-size:1rem;">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg><span id="submitLabel">Submit Harvest</span>
         </button>
 
         <a href="dashboard.php" id="backBtn" class="back-link" style="display:block; text-align:center; margin-top:1rem;">
@@ -134,7 +153,17 @@ function calculateTotal() {
 }
 
 harvestForm.addEventListener('input', () => isDirty = true);
-harvestForm.addEventListener('submit', () => isDirty = false);
+
+// FIX #12: disable submit button on submit to prevent double-submission
+harvestForm.addEventListener('submit', function () {
+    isDirty = false;
+    const btn   = document.getElementById('submitBtn');
+    const label = document.getElementById('submitLabel');
+    btn.disabled      = true;
+    btn.style.opacity = '0.6';
+    if (label) label.textContent = 'Submitting…';
+});
+
 window.addEventListener('beforeunload', e => { if (isDirty) { e.preventDefault(); e.returnValue = ''; } });
 document.getElementById('backBtn').addEventListener('click', e => {
     if (isDirty && !confirm("You have unsaved data. Leave anyway?")) e.preventDefault();
