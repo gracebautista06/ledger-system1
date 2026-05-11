@@ -37,28 +37,27 @@ $original = $res->fetch_assoc();
 $res_stmt->close();
 
 // ── Pre-defined deletion reasons per record type ─────────────────────────────
-// Each entry: key => [short label for button, full reason stored in DB]
 $preset_reasons = [
     'Harvest' => [
-        'duplicate'   => ['Duplicate entry',    'Duplicate entry — this harvest was logged twice.'],
-        'wrong_batch' => ['Wrong batch',         'Wrong batch selected — this belongs to a different batch.'],
-        'wrong_date'  => ['Wrong date',          'Wrong date — this was logged on the wrong day.'],
-        'test_entry'  => ['Accidental submit',   'Test entry — this was accidentally submitted.'],
-        'other'       => ['Other reason…',       ''],
+        'duplicate'   => ['Duplicate entry',   'Duplicate entry — this harvest was logged twice.'],
+        'wrong_batch' => ['Wrong batch',        'Wrong batch selected — this belongs to a different batch.'],
+        'wrong_date'  => ['Wrong date',         'Wrong date — this was logged on the wrong day.'],
+        'test_entry'  => ['Accidental submit',  'Test entry — this was accidentally submitted.'],
+        'other'       => ['Other reason…',      ''],
     ],
     'Sale' => [
-        'duplicate'      => ['Duplicate entry',     'Duplicate entry — this sale was recorded twice.'],
-        'cancelled'      => ['Sale cancelled',       'Cancelled transaction — the sale did not push through.'],
-        'wrong_customer' => ['Wrong customer',       'Wrong customer — this was logged under the wrong buyer.'],
-        'test_entry'     => ['Accidental submit',    'Test entry — this was accidentally submitted.'],
-        'other'          => ['Other reason…',        ''],
+        'duplicate'      => ['Duplicate entry',  'Duplicate entry — this sale was recorded twice.'],
+        'cancelled'      => ['Sale cancelled',   'Cancelled transaction — the sale did not push through.'],
+        'wrong_customer' => ['Wrong customer',   'Wrong customer — this was logged under the wrong buyer.'],
+        'test_entry'     => ['Accidental submit','Test entry — this was accidentally submitted.'],
+        'other'          => ['Other reason…',   ''],
     ],
     'Health' => [
-        'duplicate'   => ['Duplicate entry',    'Duplicate entry — this report was submitted twice.'],
-        'wrong_batch' => ['Wrong batch',         'Wrong batch selected — this belongs to a different batch.'],
-        'wrong_date'  => ['Wrong date',          'Wrong date — this was reported on the wrong day.'],
-        'test_entry'  => ['Accidental submit',   'Test entry — this was accidentally submitted.'],
-        'other'       => ['Other reason…',       ''],
+        'duplicate'   => ['Duplicate entry',   'Duplicate entry — this report was submitted twice.'],
+        'wrong_batch' => ['Wrong batch',        'Wrong batch selected — this belongs to a different batch.'],
+        'wrong_date'  => ['Wrong date',         'Wrong date — this was reported on the wrong day.'],
+        'test_entry'  => ['Accidental submit',  'Test entry — this was accidentally submitted.'],
+        'other'       => ['Other reason…',      ''],
     ],
 ];
 $reasons_for_type = $preset_reasons[$type];
@@ -80,18 +79,20 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
     $is_other     = ($reason_key === 'other');
 
     if (!array_key_exists($reason_key, $reasons_for_type)) {
-        $message = "<div class='alert error'>Invalid reason. Please try again.</div>";
+        $message = "<div class='alert error'><i class='ti ti-alert-circle' style='margin-right:6px;vertical-align:-2px;'></i>Invalid reason. Please try again.</div>";
     } elseif ($is_other && empty($reason_extra)) {
-        $message = "<div class='alert error'>Please explain your reason before sending.</div>";
+        $message = "<div class='alert error'><i class='ti ti-alert-circle' style='margin-right:6px;vertical-align:-2px;'></i>Please explain your reason before sending.</div>";
     } else {
         $full_reason = $reasons_for_type[$reason_key][1];
+        // FIX #4: reason_extra is trimmed and length-capped before use
+        $reason_extra = mb_substr($reason_extra, 0, 500);
         $final_reason = $is_other
             ? "Other: $reason_extra"
             : $full_reason . ($reason_extra ? " Additional notes: $reason_extra" : '');
 
         $ins = $conn->prepare("
-            INSERT INTO edit_requests 
-            (staff_id, record_type, record_id, request_type, reason, status, created_at) 
+            INSERT INTO edit_requests
+            (staff_id, record_type, record_id, request_type, reason, status, created_at)
             VALUES (?,?,?,'Delete',?,'Pending',NOW())
         ");
         $ins->bind_param("isis", $staff_id, $type, $id, $final_reason);
@@ -99,8 +100,9 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
         if ($ins->execute()) {
             $ins->close();
 
-            $batch_id     = (int)($original['batch_id'] ?? 0) ?: null;
-            $staff_name   = $_SESSION['name'] ?? 'A staff member';
+            $batch_id   = (int)($original['batch_id'] ?? 0) ?: null;
+            // FIX #5: use 'username' key which is what login sets in session
+            $staff_name = $_SESSION['username'] ?? 'A staff member';
             $record_label = $type === 'Sale'
                 ? "Sale to " . ($original['customer_name'] ?? "#$id")
                 : "$type (Batch: {$original['breed']})";
@@ -111,7 +113,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
             log_session_activity($conn, 'Delete Request Sent', "Requested deletion of $type #$id — reason: $final_reason");
             header("Location: view_logs.php?delete_sent=1"); exit();
         } else {
-            $message = "<div class='alert error'>Database error. Please try again.</div>";
+            $message = "<div class='alert error'><i class='ti ti-alert-circle' style='margin-right:6px;vertical-align:-2px;'></i>Database error. Please try again.</div>";
             $ins->close();
         }
     }
@@ -130,15 +132,14 @@ $posted_key = $_POST['reason_key'] ?? '';
     <!-- Original record summary -->
     <div style="background:var(--bg-wood); border-radius:var(--radius); padding:14px 16px; border-left:4px solid var(--danger); margin-bottom:1.5rem;">
         <p style="font-size:0.75rem; font-weight:700; color:var(--text-muted); margin-bottom:8px; text-transform:uppercase; letter-spacing:0.6px;">
-            Record to Delete — <?php echo $type; ?> #<?php echo $id; ?>
+            <!-- FIX #3: $type is whitelisted, $id is int-cast — both safe, kept consistent -->
+            Record to Delete — <?php echo htmlspecialchars($type); ?> #<?php echo $id; ?>
         </p>
         <?php if ($type === 'Harvest'): ?>
             <p style="margin:0; font-size:0.9rem; color:var(--text-primary);">
                 Batch: <strong><?php echo htmlspecialchars($original['breed']); ?></strong> &nbsp;|&nbsp;
-                Total: <strong style="color:var(--gold);"><?php echo number_format($original['total_eggs']); ?> eggs</strong>
-                <?php if (!empty($original['egg_size'])): ?>
-                    &nbsp;|&nbsp; Size: <strong><?php echo htmlspecialchars($original['egg_size']); ?></strong>
-                <?php endif; ?><br>
+                Total: <strong style="color:var(--gold);"><?php echo number_format($original['total_eggs']); ?> eggs</strong><br>
+                <!-- FIX #6: removed non-existent egg_size column reference entirely -->
                 <small style="color:var(--text-muted);">Logged: <?php echo date('M d, Y g:i A', strtotime($original['date_logged'])); ?></small>
             </p>
         <?php elseif ($type === 'Sale'): ?>
@@ -152,7 +153,7 @@ $posted_key = $_POST['reason_key'] ?? '';
             <p style="margin:0; font-size:0.9rem; color:var(--text-primary);">
                 Batch: <strong><?php echo htmlspecialchars($original['breed']); ?></strong> &nbsp;|&nbsp;
                 Status: <strong><?php echo htmlspecialchars($original['status_level']); ?></strong> &nbsp;|&nbsp;
-                Mortality: <strong style="color:var(--gold);"><?php echo $original['mortality_count']; ?></strong><br>
+                Mortality: <strong style="color:var(--gold);"><?php echo (int)$original['mortality_count']; ?></strong><br>
                 <small style="color:var(--text-muted);">Reported: <?php echo date('M d, Y g:i A', strtotime($original['date_reported'])); ?></small>
             </p>
         <?php endif; ?>
@@ -165,7 +166,6 @@ $posted_key = $_POST['reason_key'] ?? '';
     <?php else: ?>
         <?php echo $message; ?>
 
-        <!-- ── One form, one hidden reason_key, submit buttons act as the choice ── -->
         <p style="font-size:0.8rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px;">
             Why should this record be deleted?
         </p>
@@ -175,7 +175,6 @@ $posted_key = $_POST['reason_key'] ?? '';
 
                 <!-- "Other" — inline expandable mini-form -->
                 <div id="other_section" style="margin-bottom:8px;">
-                    <!-- Show as plain button if Other hasn't been triggered yet -->
                     <button type="button"
                             id="other_toggle_btn"
                             onclick="openOtherForm()"
@@ -202,11 +201,17 @@ $posted_key = $_POST['reason_key'] ?? '';
                         <label style="font-size:0.82rem; color:var(--text-muted); display:block; margin-bottom:6px;">
                             Explain your reason <span style="color:var(--danger);">*</span>
                         </label>
+                        <!-- FIX #8: added maxlength="500" to cap reason length -->
                         <textarea name="reason_extra" class="form-input" rows="3"
+                                  maxlength="500"
                                   placeholder="Describe why this record needs to be deleted."
-                                  style="margin-bottom:10px;"><?php echo htmlspecialchars($_POST['reason_extra'] ?? '', ENT_QUOTES); ?></textarea>
+                                  style="margin-bottom:6px;"><?php echo htmlspecialchars($_POST['reason_extra'] ?? '', ENT_QUOTES); ?></textarea>
+                        <!-- FIX #8: character counter so staff knows the limit -->
+                        <div id="reason_extra_counter" style="font-size:0.72rem; color:var(--text-muted); text-align:right; margin-bottom:10px;">
+                            <span id="reason_extra_len">0</span> / 500
+                        </div>
                         <div style="display:flex; gap:8px;">
-                            <button type="submit" class="btn-farm btn-danger" style="flex:1; padding:10px;">
+                            <button type="submit" id="other_submit_btn" class="btn-farm btn-danger" style="flex:1; padding:10px;">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                                      stroke-linecap="round" stroke-linejoin="round"
                                      style="vertical-align:middle; margin-right:5px;">
@@ -225,8 +230,8 @@ $posted_key = $_POST['reason_key'] ?? '';
             <?php else: ?>
 
                 <!-- Every other reason = single submit button, submits immediately -->
-                <form method="POST" style="margin-bottom:8px;">
-                    <input type="hidden" name="reason_key" value="<?php echo $key; ?>">
+                <form method="POST" style="margin-bottom:8px;" class="reason-form">
+                    <input type="hidden" name="reason_key" value="<?php echo htmlspecialchars($key, ENT_QUOTES); ?>">
                     <button type="submit" style="
                         display:flex; width:100%; align-items:center; gap:10px;
                         background:var(--bg-wood); border:1.5px solid var(--border-mid);
@@ -263,6 +268,37 @@ function openOtherForm() {
 function closeOtherForm() {
     document.getElementById('other_toggle_btn').style.display = 'flex';
     document.getElementById('other_form').style.display = 'none';
+}
+
+// FIX #8: live character counter for Other textarea
+const reasonExtraTA  = document.querySelector('#other_form textarea[name="reason_extra"]');
+const reasonExtraLen = document.getElementById('reason_extra_len');
+if (reasonExtraTA && reasonExtraLen) {
+    reasonExtraTA.addEventListener('input', function () {
+        reasonExtraLen.textContent = this.value.length;
+    });
+    // Init on load (for repopulated value after validation error)
+    reasonExtraLen.textContent = reasonExtraTA.value.length;
+}
+
+// FIX #7: disable preset reason buttons on submit to prevent double-posting
+document.querySelectorAll('.reason-form').forEach(function (f) {
+    f.addEventListener('submit', function () {
+        this.querySelectorAll('button[type=submit]').forEach(function (b) {
+            b.disabled = true;
+            b.style.opacity = '0.6';
+            b.style.cursor  = 'not-allowed';
+        });
+    });
+});
+
+// FIX #7: disable Other submit button on submit
+const otherForm = document.getElementById('other_form');
+if (otherForm) {
+    otherForm.addEventListener('submit', function () {
+        const btn = document.getElementById('other_submit_btn');
+        if (btn) { btn.disabled = true; btn.style.opacity = '0.6'; btn.style.cursor = 'not-allowed'; }
+    });
 }
 </script>
 
