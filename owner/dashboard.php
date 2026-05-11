@@ -1,15 +1,17 @@
 <?php
-
 $page_title = 'Owner Dashboard';
 
 session_start();
 include('../includes/db.php');
-include('../includes/header.php');
-include('../includes/notifications.php');
 
+// ✅ Role check BEFORE header
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'Owner') {
     header("Location: ../portal/login.php"); exit();
 }
+
+include('../includes/header.php');
+include('../includes/notifications.php');
+
 
 // ── STATS ─────────────────────────────────────────────────────
 $req_query     = $conn->query("SELECT COUNT(*) AS total FROM edit_requests WHERE status='Pending'");

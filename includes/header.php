@@ -12,125 +12,112 @@
         $root   = str_repeat('../', $levels);
         if (session_status() === PHP_SESSION_NONE) session_start();
 
-        // Update last_seen timestamp for logged-in users (used for online/offline status in users.php)
         if (isset($_SESSION['user_id']) && isset($conn)) {
             include_once $root . 'includes/update_last_seen.php';
         }
     ?>
 
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- IMPROVEMENT: Load both Playfair Display (headings) + DM Sans (body) -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?php echo $root; ?>assets/css/style.css">
 </head>
 <body>
 
+<?php
+// ── Decide which sidebar and topbar to show ────────────────
+$is_logged_in   = isset($_SESSION['role']);
+$is_owner       = $is_logged_in && $_SESSION['role'] === 'Owner';
+$is_staff       = $is_logged_in && $_SESSION['role'] === 'Staff';
+$show_sidebar   = $is_owner || $is_staff;
+
+// ── Notification count for bell (Owner only) ───────────────
+$bell_unread = 0;
+if ($is_owner && isset($conn) && isset($_SESSION['user_id'])) {
+    $bell_q = $conn->prepare("
+        SELECT COUNT(*) AS cnt
+        FROM staff_notifications sn
+        WHERE sn.status = 'unread'
+          AND sn.notif_type IN ('edit_request','delete_request','progress_update','sale_request')
+          AND (
+              sn.notif_type NOT IN ('edit_request','delete_request')
+              OR EXISTS (
+                  SELECT 1 FROM edit_requests er
+                  WHERE er.record_type  = sn.record_type
+                    AND er.record_id    = sn.record_id
+                    AND er.request_type IN ('Edit','Delete')
+                    AND er.status       = 'Pending'
+              )
+          )
+    ");
+    $bell_q->execute();
+    $bell_unread = (int)$bell_q->get_result()->fetch_assoc()['cnt'];
+    $bell_q->close();
+}
+?>
+
+<?php if ($show_sidebar): ?>
+<!-- ── LAYOUT WRAPPER (Sidebar + Main) ──────────────────── -->
+<div class="layout-wrapper">
+
+    <!-- SIDEBAR -->
+    <?php
+        if ($is_owner) include_once $root . 'includes/sidebar_owner.php';
+        if ($is_staff) include_once $root . 'includes/sidebar_staff.php';
+    ?>
+
+    <!-- SIDEBAR OVERLAY (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+
+        <!-- TOP BAR -->
+        <header class="topbar">
+            <div class="topbar-left">
+                <!-- Mobile toggle -->
+                <button class="sidebar-toggle" id="sidebarToggle" aria-label="Toggle menu">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <span class="topbar-title">
+                    <?php echo isset($page_title) ? htmlspecialchars($page_title) : 'Dashboard'; ?>
+                </span>
+            </div>
+            <div class="topbar-right">
+                <?php if ($is_owner): ?>
+                <a href="<?php echo $root; ?>owner/staff_notifications.php"
+                   class="topbar-bell" title="Notifications">
+                    <i class="fa-solid fa-bell"></i>
+                    <?php if ($bell_unread > 0): ?>
+                        <span class="topbar-bell-badge">
+                            <?php echo $bell_unread > 99 ? '99+' : $bell_unread; ?>
+                        </span>
+                    <?php endif; ?>
+                </a>
+                <?php endif; ?>
+                <span class="topbar-date">
+                    <?php echo date('M j, Y'); ?>
+                </span>
+            </div>
+        </header>
+
+        <!-- PAGE CONTENT -->
+        <main role="main">
+            <div class="container">
+
+<?php else: ?>
+<!-- ── PUBLIC PAGES (login, register, index) ────────────── -->
 <header>
     <nav class="navbar">
         <a href="<?php echo $root; ?>index.php" class="logo">Egg Ledger</a>
-
         <ul class="nav-links">
             <li><a href="<?php echo $root; ?>index.php">Home</a></li>
-
-            <?php if (isset($_SESSION['username'])): ?>
-                <li>
-                    <?php if ($_SESSION['role'] === 'Owner'): ?>
-                        <a href="<?php echo $root; ?>owner/profile.php" class="nav-user-info" style="text-decoration:none;" title="My Profile">
-                            👤 <?php echo htmlspecialchars($_SESSION['username']); ?>
-                            <span class="badge badge-owner" style="font-size:0.62rem;">Owner</span>
-                        </a>
-                    <?php else: ?>
-                        <a href="<?php echo $root; ?>staff/profile.php" class="nav-user-info" style="text-decoration:none;" title="My Profile">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                            <?php echo htmlspecialchars($_SESSION['username']); ?>
-                            <span class="badge badge-staff" style="font-size:0.62rem;">Staff</span>
-                        </a>
-                    <?php endif; ?>
-                </li>
-                <li>
-                    <?php $dashboard_link = ($_SESSION['role'] === 'Owner')
-                        ? $root . 'owner/dashboard.php'
-                        : $root . 'staff/dashboard.php'; ?>
-                    <a href="<?php echo $dashboard_link; ?>">Dashboard</a>
-                </li>
-
-                <?php
-                // ── Notification bell ──────────────────────────────────
-                if (isset($conn) && isset($_SESSION['user_id'])) {
-                    $bell_uid  = (int)$_SESSION['user_id'];
-                    $bell_role = $_SESSION['role'] ?? '';
-
-                    if ($bell_role === 'Owner') {
-                        // Owner sees unread notifications only where the linked request is still Pending
-                        $bell_q = $conn->prepare("
-                            SELECT COUNT(*) AS cnt
-                            FROM staff_notifications sn
-                            WHERE sn.status = 'unread'
-                              AND sn.notif_type IN ('edit_request','delete_request','progress_update','sale_request')
-                              AND (
-                                  -- for edit/delete requests, only count if still pending
-                                  sn.notif_type NOT IN ('edit_request','delete_request')
-                                  OR EXISTS (
-                                      SELECT 1 FROM edit_requests er
-                                      WHERE er.record_type  = sn.record_type
-                                        AND er.record_id    = sn.record_id
-                                        AND er.request_type IN ('Edit','Delete')
-                                        AND er.status       = 'Pending'
-                                  )
-                              )
-                        ");
-                        $bell_q->execute();
-                        $bell_unread = (int)$bell_q->get_result()->fetch_assoc()['cnt'];
-                        $bell_q->close();
-                        $bell_href = $root . 'owner/staff_notifications.php';
-
-                    } else {
-                        $bell_unread = 0;
-                        $bell_href   = '#';
-                    }
-                ?>
-                <?php if ($bell_role === 'Owner'): ?>
-                <li>
-                    <a href="<?php echo $bell_href; ?>" class="nav-bell" title="Notifications"
-                       style="position:relative; display:inline-flex; align-items:center; padding:4px 6px; text-decoration:none;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                             stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                             style="vertical-align:middle;">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                        <?php if ($bell_unread > 0): ?>
-                            <span style="
-                                position:absolute; top:-4px; right:-4px;
-                                background:var(--danger, #c23a3a);
-                                color:#fff;
-                                font-size:0.6rem;
-                                font-weight:700;
-                                min-width:16px; height:16px;
-                                border-radius:999px;
-                                display:flex; align-items:center; justify-content:center;
-                                padding:0 3px;
-                                line-height:1;
-                                pointer-events:none;">
-                                <?php echo $bell_unread > 99 ? '99+' : $bell_unread; ?>
-                            </span>
-                        <?php endif; ?>
-                    </a>
-                </li>
-                <?php endif; ?>
-                <?php } // end if isset($conn) ?>
-
-                <li>
-                    <a href="<?php echo $root; ?>portal/logout.php" class="nav-logout">Logout 🚪</a>
-                </li>
-            <?php else: ?>
-                <li><a href="<?php echo $root; ?>portal/register.php">Register</a></li>
-                <li><a href="<?php echo $root; ?>portal/login.php">Login</a></li>
-            <?php endif; ?>
+            <li><a href="<?php echo $root; ?>portal/register.php">Register</a></li>
+            <li><a href="<?php echo $root; ?>portal/login.php">Login</a></li>
         </ul>
     </nav>
 </header>
-
 <main role="main">
     <div class="container">
+<?php endif; ?>
