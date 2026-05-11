@@ -162,11 +162,63 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                        + COALESCE(size_l,0) + COALESCE(size_xl,0) + COALESCE(size_j,0)
                         WHERE harvest_id = {$record_id}
                     ");
+
+                    // ── Stock-safety check: warn if new harvest totals are below sold qty ──
+                    $hbq = $conn->query("SELECT batch_id FROM harvests WHERE harvest_id = {$record_id} LIMIT 1");
+                    $hb  = $hbq ? $hbq->fetch_assoc() : null;
+                    if ($hb) {
+                        $hbatch = (int)$hb['batch_id'];
+
+                        // All harvested eggs per size for this batch (including the just-updated record)
+                        $th_q = $conn->query("
+                            SELECT COALESCE(SUM(size_pw),0) AS pw, COALESCE(SUM(size_s),0)  AS s,
+                                   COALESCE(SUM(size_m),0)  AS m,  COALESCE(SUM(size_l),0)  AS l,
+                                   COALESCE(SUM(size_xl),0) AS xl, COALESCE(SUM(size_j),0)  AS j
+                            FROM harvests WHERE batch_id = {$hbatch}
+                        ");
+                        $total_harv = $th_q ? $th_q->fetch_assoc() : [];
+
+                        $has_bc = $conn->query("SHOW COLUMNS FROM sales LIKE 'batch_id'")->num_rows > 0;
+                        if ($has_bc) {
+                            $ts_q = $conn->query("
+                                SELECT COALESCE(SUM(qty_pw),0) AS pw, COALESCE(SUM(qty_s),0)  AS s,
+                                       COALESCE(SUM(qty_m),0)  AS m,  COALESCE(SUM(qty_l),0)  AS l,
+                                       COALESCE(SUM(qty_xl),0) AS xl, COALESCE(SUM(qty_j),0)  AS j
+                                FROM sales WHERE batch_id = {$hbatch}
+                            ");
+                        } else {
+                            $arrq = $conn->query("SELECT COALESCE(date_acquired, '2000-01-01') AS arr FROM batches WHERE batch_id = {$hbatch}");
+                            $arr_esc2 = $conn->real_escape_string($arrq ? $arrq->fetch_assoc()['arr'] : '2000-01-01');
+                            $ts_q = $conn->query("
+                                SELECT COALESCE(SUM(qty_pw),0) AS pw, COALESCE(SUM(qty_s),0)  AS s,
+                                       COALESCE(SUM(qty_m),0)  AS m,  COALESCE(SUM(qty_l),0)  AS l,
+                                       COALESCE(SUM(qty_xl),0) AS xl, COALESCE(SUM(qty_j),0)  AS j
+                                FROM sales WHERE DATE(date_sold) >= '{$arr_esc2}'
+                            ");
+                        }
+                        $total_sold_trays = $ts_q ? $ts_q->fetch_assoc() : [];
+
+                        $inv_warnings = [];
+                        $sz_labels2   = ['pw'=>'Peewee','s'=>'Small','m'=>'Medium','l'=>'Large','xl'=>'XL','j'=>'Jumbo'];
+                        foreach ($sz_labels2 as $sz => $lbl) {
+                            $harv_trays2 = (int)floor((int)($total_harv[$sz] ?? 0) / 30);
+                            $sold_trays2 = (int)($total_sold_trays[$sz] ?? 0);
+                            if ($sold_trays2 > $harv_trays2) {
+                                $inv_warnings[] = "{$lbl}: {$sold_trays2} tray(s) sold but only {$harv_trays2} tray(s) harvested after edit";
+                            }
+                        }
+                        if (!empty($inv_warnings)) {
+                            // Append inventory warning to the owner note so it's visible in the log
+                            $inv_note = ' [Inventory warning after edit: ' . implode('; ', $inv_warnings) . ']';
+                            $owner_note .= $inv_note;
+                        }
+                    }
                 }
                 if ($sale_qty_touched) {
                     // Step 1: get the updated qty_* values and the batch breed
                     $sale_row_q = $conn->query("
                         SELECT s.qty_pw, s.qty_s, s.qty_m, s.qty_l, s.qty_xl, s.qty_j,
+                               s.total_amount AS existing_total,
                                b.breed
                         FROM sales s
                         LEFT JOIN batches b ON s.batch_id = b.batch_id
@@ -208,7 +260,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             $new_total_amount += $qty * ($prices[$code] ?? 0);
                         }
                         $new_total_amount = round($new_total_amount, 2);
-                        $new_unit_price   = $new_total_trays > 0
+
+                        // Guard: if no prices are available, keep the existing total_amount
+                        // rather than writing ₱0.00 silently.
+                        if ($new_total_amount <= 0 && empty($prices)) {
+                            $new_total_amount = (float)($sale_row['existing_total'] ?? 0);
+                        }
+
+                        $new_unit_price = $new_total_trays > 0
                             ? round($new_total_amount / $new_total_trays, 2)
                             : 0.00;
 
@@ -570,4 +629,4 @@ function format_field_value(string $field_key, string $value): string {
 
 </div>
 
-<?php include('../includes/footer.php'); ?>
+<?php include('../includes/footer.php'); ?>         

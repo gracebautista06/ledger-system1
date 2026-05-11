@@ -23,7 +23,7 @@ $filter_status  = $_GET['status']  ?? 'all';
 
 $allowed_methods = ['all', 'Cash', 'GCash', 'Bank Transfer'];
 if (!in_array($filter_method, $allowed_methods, true)) $filter_method = 'all';
-$allowed_statuses = ['all', 'Healthy', 'Mild', 'Moderate', 'Critical'];
+$allowed_statuses = ['all', 'Healthy', 'Warning', 'Critical'];
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = 'all';
 
 // ── FETCH BATCHES FOR DROPDOWN ────────────────────────────────────────────────
@@ -154,8 +154,7 @@ if ($report_type && isset($_GET['from'])) {
                 COALESCE(SUM(fh.mortality_count), 0)  AS total_mortality,
                 COALESCE(AVG(fh.mortality_count), 0)  AS avg_mortality,
                 SUM(CASE WHEN fh.status_level='Critical' THEN 1 ELSE 0 END) AS critical_count,
-                SUM(CASE WHEN fh.status_level='Moderate' THEN 1 ELSE 0 END) AS moderate_count,
-                SUM(CASE WHEN fh.status_level='Mild'     THEN 1 ELSE 0 END) AS mild_count,
+                SUM(CASE WHEN fh.status_level='Warning'  THEN 1 ELSE 0 END) AS moderate_count,
                 SUM(CASE WHEN fh.status_level='Healthy'  THEN 1 ELSE 0 END) AS healthy_count
             FROM flock_health fh $where");
         $s->bind_param($types, ...$vals);
@@ -275,7 +274,8 @@ $type_icons = [
         <div class="type-grid">
             <?php foreach (['harvest','sales','flock'] as $t): ?>
             <a href="?type=<?php echo $t; ?>&from=<?php echo urlencode($date_from); ?>&to=<?php echo urlencode($date_to); ?>"
-               class="type-card <?php echo $report_type === $t ? 'active' : ''; ?>">
+               class="type-card <?php echo $report_type === $t ? 'active' : ''; ?>"
+               onclick="fetchReport('<?php echo $t; ?>',null,null,event)">
                 <span class="type-card__icon"><?php echo $type_icons[$t]; ?></span>
                 <span class="type-card__label"><?php echo $type_labels[$t]; ?></span>
                 <span class="type-card__sub">
@@ -296,7 +296,7 @@ $type_icons = [
                   text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px;">
             Step 2 — Set Date Range &amp; Filters
         </p>
-        <form method="GET" class="filter-bar">
+        <form method="GET" class="filter-bar" id="filter-form" onsubmit="fetchReport(null,null,null,event)">
             <input type="hidden" name="type" value="<?php echo htmlspecialchars($report_type); ?>">
 
             <div class="form-group">
@@ -341,7 +341,7 @@ $type_icons = [
             <div class="form-group">
                 <label>Status Level</label>
                 <select name="status" class="form-input">
-                    <?php foreach (['all'=>'All Statuses','Healthy'=>'Healthy','Mild'=>'Mild','Moderate'=>'Moderate','Critical'=>'Critical'] as $v => $lbl): ?>
+                    <?php foreach (['all'=>'All Statuses','Healthy'=>'Healthy','Warning'=>'Warning','Critical'=>'Critical'] as $v => $lbl): ?>
                         <option value="<?php echo $v; ?>" <?php echo $filter_status === $v ? 'selected' : ''; ?>>
                             <?php echo htmlspecialchars($lbl); ?>
                         </option>
@@ -352,13 +352,14 @@ $type_icons = [
 
             <div style="display:flex; gap:6px; padding-bottom:1px;">
                 <button type="submit" class="btn-farm btn-sm">Generate Report</button>
-                <a href="?type=<?php echo htmlspecialchars($report_type); ?>" class="btn-farm btn-dark btn-sm">Reset</a>
+                <a href="?type=<?php echo htmlspecialchars($report_type); ?>" class="btn-farm btn-dark btn-sm" onclick="resetReport(event)">Reset</a>
             </div>
         </form>
     </div>
 
     <?php if ($generated): ?>
 
+    <div id="report-results">
     <!-- ── REPORT HEADER (print-visible) ───────────────────────────── -->
     <div style="display:flex; justify-content:space-between; align-items:center;
                 flex-wrap:wrap; gap:10px; margin-bottom:1.2rem;">
@@ -459,15 +460,14 @@ $type_icons = [
         </div>
         <div class="stat-card" style="border-top:4px solid var(--terra-lt);">
             <div class="stat-label">Avg Mortality</div>
-            <div class="stat-value"><?php echo number_format((float)$report_stats['avg_mortality'], 1); ?></div>
+            <div class="stat-value"><?php echo (int)round($report_stats['avg_mortality']); ?></div>
             <div class="stat-sub">per report</div>
         </div>
         <div class="stat-card" style="border-top:4px solid var(--info);">
             <div class="stat-label">Status Breakdown</div>
             <div class="stat-value" style="font-size:0.82rem; line-height:1.6;">
                 <span style="color:var(--danger);">Critical: <?php echo (int)$report_stats['critical_count']; ?></span> &nbsp;
-                <span style="color:#ff8c00;">Moderate: <?php echo (int)$report_stats['moderate_count']; ?></span><br>
-                <span style="color:var(--gold);">Mild: <?php echo (int)$report_stats['mild_count']; ?></span> &nbsp;
+                <span style="color:#ff8c00;">Warning: <?php echo (int)$report_stats['moderate_count']; ?></span><br>
                 <span style="color:var(--success);">Healthy: <?php echo (int)$report_stats['healthy_count']; ?></span>
             </div>
             <div class="stat-sub">across period</div>
@@ -619,8 +619,7 @@ $type_icons = [
                 <?php if (!empty($report_data)): foreach ($report_data as $row):
                     $status_badge = match($row['status_level']) {
                         'Critical' => 'badge-critical',
-                        'Moderate' => 'badge-moderate',
-                        'Mild'     => 'badge-mild',
+                        'Warning'  => 'badge-moderate',
                         default    => 'badge-healthy',
                     };
                 ?>
@@ -672,6 +671,8 @@ $type_icons = [
         </div>
     </div>
 
+    </div><!-- /#report-results -->
+
     <?php else: /* $generated but type chosen — show prompt */ ?>
     <div class="card">
         <div class="rpt-empty">
@@ -696,5 +697,61 @@ $type_icons = [
 
     <a href="dashboard.php" class="back-link no-print">← Back to Dashboard</a>
 </div>
+
+<script>
+function fetchReport(type, from, to, e) {
+    if (e) e.preventDefault();
+
+    const form = document.getElementById('filter-form');
+    const params = new URLSearchParams(form ? new FormData(form) : {});
+
+    if (type)  params.set('type', type);
+    if (from)  params.set('from', from);
+    if (to)    params.set('to', to);
+
+    // Update active tab visually
+    if (type) {
+        document.querySelectorAll('.type-card').forEach(c => c.classList.remove('active'));
+        const activeCard = [...document.querySelectorAll('.type-card')].find(c => c.href.includes('type=' + type));
+        if (activeCard) activeCard.classList.add('active');
+        if (form) form.querySelector('[name=type]').value = type;
+    }
+
+    const resultsEl = document.getElementById('report-results');
+    if (resultsEl) {
+        resultsEl.style.opacity = '0.4';
+        resultsEl.style.pointerEvents = 'none';
+    }
+
+    fetch('reports.php?' + params.toString())
+        .then(r => r.text())
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            const newResults = doc.getElementById('report-results');
+            const placeholder = document.getElementById('report-results');
+            if (newResults && placeholder) {
+                placeholder.innerHTML = newResults.innerHTML;
+                placeholder.style.opacity = '1';
+                placeholder.style.pointerEvents = '';
+            } else {
+                // If no results div yet (first load), reload normally
+                window.location.href = 'reports.php?' + params.toString();
+            }
+            // Update browser URL without reload
+            history.pushState({}, '', 'reports.php?' + params.toString());
+        })
+        .catch(() => {
+            window.location.href = 'reports.php?' + params.toString();
+        });
+}
+
+function resetReport(e) {
+    e.preventDefault();
+    const form = document.getElementById('filter-form');
+    const type = form ? form.querySelector('[name=type]').value : '';
+    window.location.href = 'reports.php?type=' + type;
+}
+</script>
+
 
 <?php include('../includes/footer.php'); ?>

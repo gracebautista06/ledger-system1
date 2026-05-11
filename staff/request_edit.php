@@ -60,10 +60,28 @@ if ($type === 'Harvest') {
         'qty_l'         => ['label' => 'Large Trays',      'type' => 'number',         'value' => (int)($original['qty_l']   ?? 0), 'attrs' => 'min="0"'],
         'qty_xl'        => ['label' => 'Extra Large Trays','type' => 'number',         'value' => (int)($original['qty_xl']  ?? 0), 'attrs' => 'min="0"'],
         'qty_j'         => ['label' => 'Jumbo Trays',      'type' => 'number',         'value' => (int)($original['qty_j']   ?? 0), 'attrs' => 'min="0"'],
-        'total_amount'  => ['label' => 'Total Amount (₱)', 'type' => 'number',         'value' => $original['total_amount'],        'attrs' => 'min="0" step="0.01"'],
         'customer_name' => ['label' => 'Customer Name',    'type' => 'text',           'value' => $original['customer_name'],       'attrs' => 'maxlength="120"'],
         'date_sold'     => ['label' => 'Date of Sale',     'type' => 'datetime-local', 'value' => date('Y-m-d\TH:i', strtotime($original['date_sold'])), 'attrs' => ''],
     ];
+
+    // Load breed prices for this sale so the form can show a live total preview
+    $sale_breed_prices = [];
+    $sale_batch_id     = (int)($original['batch_id'] ?? 0);
+    if ($sale_batch_id > 0) {
+        $bp_stmt = $conn->prepare("
+            SELECT bp.size_code, bp.price_per_tray
+            FROM breed_prices bp
+            JOIN batches b ON b.breed = bp.breed
+            WHERE b.batch_id = ?
+        ");
+        $bp_stmt->bind_param('i', $sale_batch_id);
+        $bp_stmt->execute();
+        $bp_res = $bp_stmt->get_result();
+        while ($bp_row = $bp_res->fetch_assoc()) {
+            $sale_breed_prices[$bp_row['size_code']] = (float)$bp_row['price_per_tray'];
+        }
+        $bp_stmt->close();
+    }
 } elseif ($type === 'Health') {
     $editable_fields = [
         'mortality_count' => ['label' => 'Mortality Count',  'type' => 'number',         'value' => $original['mortality_count'], 'attrs' => 'min="0"'],
@@ -295,6 +313,36 @@ if ($_SERVER["REQUEST_METHOD"] === "POST" && !$already_pending) {
                 <?php endforeach; ?>
             </div>
 
+            <?php if ($type === 'Sale'): ?>
+            <!-- ── Live total preview for Sale qty changes ── -->
+            <div id="sale-total-preview" style="background:var(--bg-wood); border:1px solid var(--border-mid); border-radius:var(--radius); padding:14px 16px; margin-bottom:1rem;">
+                <p style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin:0 0 8px;">
+                    Recalculated Total
+                </p>
+                <?php if (empty($sale_breed_prices)): ?>
+                <p style="font-size:0.85rem; color:var(--text-muted); margin:0; font-style:italic;">
+                    No prices set for this breed — total cannot be calculated.
+                </p>
+                <?php else: ?>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+                    <div>
+                        <span style="font-size:0.82rem; color:var(--text-muted);">Current total: </span>
+                        <strong style="color:var(--text-muted);">₱<?php echo number_format((float)$original['total_amount'], 2); ?></strong>
+                    </div>
+                    <div>
+                        <span style="font-size:0.82rem; color:var(--text-muted);">New total: </span>
+                        <strong id="live-total" style="font-size:1.1rem; color:var(--gold);">
+                            ₱<?php echo number_format((float)$original['total_amount'], 2); ?>
+                        </strong>
+                    </div>
+                </div>
+                <p id="live-total-note" style="font-size:0.75rem; color:var(--text-muted); margin:6px 0 0; display:none;">
+                    Total will be recalculated automatically when the Owner approves this request.
+                </p>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
+
             <!-- ── Change summary (live preview) ── -->
             <div id="change-summary" style="display:none; background:var(--bg-wood); border:1px solid var(--border-mid); border-radius:var(--radius); padding:10px 14px; margin-bottom:1rem;">
                 <p style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px; margin:0 0 6px;">Changes to be submitted</p>
@@ -330,6 +378,27 @@ const fieldMeta = <?php echo json_encode(array_map(fn($k, $v) => [
     'type'  => $v['type'],
     'value' => (string)$v['value'],
 ], array_keys($editable_fields), $editable_fields)); ?>;
+
+<?php if ($type === 'Sale' && !empty($sale_breed_prices)): ?>
+// Prices keyed by size code (PW, S, M, L, XL, J) → price per tray
+const SALE_PRICES = <?php echo json_encode($sale_breed_prices); ?>;
+const QTY_FIELDS  = ['qty_pw','qty_s','qty_m','qty_l','qty_xl','qty_j'];
+const SIZE_CODES  = ['PW','S','M','L','XL','J'];
+
+function recalcSaleTotal() {
+    let total = 0;
+    QTY_FIELDS.forEach((field, i) => {
+        const input = document.getElementById('field_' + field);
+        const qty   = input ? (parseInt(input.value) || 0) : 0;
+        const code  = SIZE_CODES[i];
+        total      += qty * (SALE_PRICES[code] || 0);
+    });
+    const el = document.getElementById('live-total');
+    const note = document.getElementById('live-total-note');
+    if (el) el.textContent = '₱' + total.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    if (note) note.style.display = total > 0 ? 'block' : 'none';
+}
+<?php endif; ?>
 
 function getChanges() {
     const changes = [];
@@ -391,11 +460,24 @@ function updateUI() {
 }
 
 document.querySelectorAll('.field-input').forEach(input => {
-    input.addEventListener('input', updateUI);
-    input.addEventListener('change', updateUI);
+    input.addEventListener('input', () => {
+        updateUI();
+        <?php if ($type === 'Sale' && !empty($sale_breed_prices)): ?>
+        if (QTY_FIELDS.includes(input.dataset.key)) recalcSaleTotal();
+        <?php endif; ?>
+    });
+    input.addEventListener('change', () => {
+        updateUI();
+        <?php if ($type === 'Sale' && !empty($sale_breed_prices)): ?>
+        if (QTY_FIELDS.includes(input.dataset.key)) recalcSaleTotal();
+        <?php endif; ?>
+    });
 });
 
 updateUI(); // init on load
+<?php if ($type === 'Sale' && !empty($sale_breed_prices)): ?>
+recalcSaleTotal(); // init total on load
+<?php endif; ?>
 </script>
 
 <?php include('../includes/footer.php'); ?>

@@ -35,7 +35,7 @@ $filter_method = $_GET['method'] ?? 'all';
 $filter_status = $_GET['status'] ?? 'all';
 
 $allowed_methods  = ['all', 'Cash', 'GCash', 'Bank Transfer'];
-$allowed_statuses = ['all', 'Healthy', 'Mild', 'Moderate', 'Critical'];
+$allowed_statuses = ['all', 'Healthy', 'Warning', 'Critical'];
 if (!in_array($filter_method, $allowed_methods,  true)) $filter_method = 'all';
 if (!in_array($filter_status, $allowed_statuses, true)) $filter_status = 'all';
 
@@ -116,8 +116,7 @@ if ($report_type === 'harvest') {
                COALESCE(SUM(fh.mortality_count),0) AS total_mortality,
                COALESCE(AVG(fh.mortality_count),0) AS avg_mortality,
                SUM(CASE WHEN fh.status_level='Critical' THEN 1 ELSE 0 END) AS critical_count,
-               SUM(CASE WHEN fh.status_level='Moderate' THEN 1 ELSE 0 END) AS moderate_count,
-               SUM(CASE WHEN fh.status_level='Mild'     THEN 1 ELSE 0 END) AS mild_count,
+               SUM(CASE WHEN fh.status_level='Warning' THEN 1 ELSE 0 END) AS moderate_count,
                SUM(CASE WHEN fh.status_level='Healthy'  THEN 1 ELSE 0 END) AS healthy_count
         FROM flock_health fh $where");
     $s->bind_param($types, ...$vals); $s->execute();
@@ -125,7 +124,7 @@ if ($report_type === 'harvest') {
 
     $s = $conn->prepare("
         SELECT fh.report_id, fh.date_reported, fh.mortality_count,
-               fh.status_level, fh.notes, b.breed, b.coop_number,
+               fh.status_level, fh.symptoms, b.breed, b.coop_number,
                u.username AS staff_name
         FROM flock_health fh
         JOIN batches b ON fh.batch_id = b.batch_id
@@ -231,12 +230,12 @@ if ($format === 'excel') {
 
         // Summary
         fputcsv($out, ['SUMMARY']);
-        fputcsv($out, ['Reports Filed', 'Total Mortality', 'Avg Mortality', 'Critical', 'Moderate', 'Mild', 'Healthy']);
+        fputcsv($out, ['Reports Filed', 'Total Mortality', 'Avg Mortality', 'Critical', 'Warning', 'Healthy']);
         fputcsv($out, [
             $stats['total_reports'], $stats['total_mortality'],
-            number_format((float)$stats['avg_mortality'], 1),
+            (int)round($stats['avg_mortality']),
             $stats['critical_count'], $stats['moderate_count'],
-            $stats['mild_count'],     $stats['healthy_count'],
+            $stats['healthy_count'],
         ]);
         fputcsv($out, []);
 
@@ -270,8 +269,7 @@ if ($format === 'excel') {
 function status_color(string $s): string {
     return match($s) {
         'Critical' => '#c23a3a',
-        'Moderate' => '#e07b00',
-        'Mild'     => '#b8960c',
+        'Warning'  => '#e07b00',
         default    => '#2e7d32',
     };
 }
@@ -555,7 +553,7 @@ tfoot .tfoot-label { text-align: right; color: #5a4a2a; }
         </div>
         <div class="stat-box">
             <div class="stat-box__label">Avg Mortality</div>
-            <div class="stat-box__value"><?php echo number_format((float)$stats['avg_mortality'], 1); ?></div>
+            <div class="stat-box__value"><?php echo (int)round($stats['avg_mortality']); ?></div>
             <div class="stat-box__sub">per report</div>
         </div>
         <div class="stat-box">
@@ -563,7 +561,6 @@ tfoot .tfoot-label { text-align: right; color: #5a4a2a; }
             <div class="stat-box__value" style="font-size:11px; line-height:1.7;">
                 <span style="color:#c23a3a; font-weight:700;">Critical <?php echo (int)$stats['critical_count']; ?></span> &nbsp;
                 <span style="color:#e07b00; font-weight:700;">Moderate <?php echo (int)$stats['moderate_count']; ?></span><br>
-                <span style="color:#b8960c; font-weight:700;">Mild <?php echo (int)$stats['mild_count']; ?></span> &nbsp;
                 <span style="color:#2e7d32; font-weight:700;">Healthy <?php echo (int)$stats['healthy_count']; ?></span>
             </div>
         </div>

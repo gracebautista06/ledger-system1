@@ -218,8 +218,8 @@ $size_labels = ['size_pw'=>'PW', 'size_s'=>'S', 'size_m'=>'M', 'size_l'=>'L', 's
                        value="<?php echo htmlspecialchars($search); ?>">
             </div>
             <div style="padding-bottom:1px; display:flex; gap:8px;">
-                <button type="submit" class="btn-farm btn-sm">🔍 Filter</button>
-                <a href="flock_history.php" class="btn-farm btn-dark btn-sm">✕ Reset</a>
+                <button type="submit" class="btn-farm btn-sm">🔍</button>
+                <a href="flock_history.php" class="btn-farm btn-dark btn-sm">Cancel</a>
             </div>
         </form>
     </div>

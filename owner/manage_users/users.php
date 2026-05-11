@@ -294,6 +294,18 @@ function format_last_seen(?string $last_seen, int $is_online): string
 </div>
 
 <script>
+// Auto-dismiss alert messages after 4 seconds
+document.addEventListener('DOMContentLoaded', () => {
+    const alerts = document.querySelectorAll('.alert');
+    alerts.forEach(alert => {
+        setTimeout(() => {
+            alert.style.transition = 'opacity 0.6s ease';
+            alert.style.opacity = '0';
+            setTimeout(() => alert.remove(), 650);
+        }, 4000);
+    });
+});
+
 function toggleAddPanel() {
     const panel = document.getElementById('add-panel');
     const visible = panel.style.display !== 'none';
@@ -305,7 +317,25 @@ function toggleAddPanel() {
 document.addEventListener('DOMContentLoaded', toggleAddPanel);
 <?php endif; ?>
 
-setTimeout(() => location.reload(), 30000);
+function refreshOnlineStatus() {
+    fetch('users.php', { method: 'GET' })
+        .then(r => r.text())
+        .then(html => {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            document.querySelectorAll('tbody tr').forEach((row, i) => {
+                const newRow = doc.querySelectorAll('tbody tr')[i];
+                if (newRow) {
+                    const statusCell    = row.querySelector('td:nth-child(5)');
+                    const newStatusCell = newRow.querySelector('td:nth-child(5)');
+                    if (statusCell && newStatusCell) {
+                        statusCell.innerHTML = newStatusCell.innerHTML;
+                    }
+                }
+            });
+        })
+        .catch(() => {}); // fail silently — don't disrupt the user
+}
+setInterval(refreshOnlineStatus, 30000);
 </script>
 
 <?php include('../../includes/footer.php'); ?>

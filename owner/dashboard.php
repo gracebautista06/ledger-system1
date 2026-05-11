@@ -303,7 +303,7 @@ $js_rev_data = json_encode($rev_data);
         </div>
         <div style="display:flex; flex-direction:column; gap:6px;">
             <a href="manage_inventory/data_management.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
+               class="btn-farm btn-purple" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
                 Data Management
             </a>
             <a href="manage_users/users.php"

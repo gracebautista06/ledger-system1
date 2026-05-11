@@ -35,13 +35,18 @@
 
             <?php if (isset($_SESSION['username'])): ?>
                 <li>
-                    <span class="nav-user-info">
-                        👤 <?php echo htmlspecialchars($_SESSION['username']); ?>
-                        <span class="badge <?php echo strtolower($_SESSION['role']) === 'owner' ? 'badge-owner' : 'badge-staff'; ?>"
-                              style="font-size:0.62rem;">
-                            <?php echo htmlspecialchars($_SESSION['role']); ?>
-                        </span>
-                    </span>
+                    <?php if ($_SESSION['role'] === 'Owner'): ?>
+                        <a href="<?php echo $root; ?>owner/profile.php" class="nav-user-info" style="text-decoration:none;" title="My Profile">
+                            👤 <?php echo htmlspecialchars($_SESSION['username']); ?>
+                            <span class="badge badge-owner" style="font-size:0.62rem;">Owner</span>
+                        </a>
+                    <?php else: ?>
+                        <a href="<?php echo $root; ?>staff/profile.php" class="nav-user-info" style="text-decoration:none;" title="My Profile">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px;"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                            <?php echo htmlspecialchars($_SESSION['username']); ?>
+                            <span class="badge badge-staff" style="font-size:0.62rem;">Staff</span>
+                        </a>
+                    <?php endif; ?>
                 </li>
                 <li>
                     <?php $dashboard_link = ($_SESSION['role'] === 'Owner')

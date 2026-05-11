@@ -61,6 +61,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
+    } elseif ($action === 'edit') {
+        $id          = intval($_POST['batch_id']);
+        $breed       = $conn->real_escape_string(trim($_POST['breed'] ?? ''));
+        $quantity    = max(1, intval($_POST['quantity']));
+        $coop_number = intval($_POST['coop_number'] ?? 0);
+        $coop_label  = $conn->real_escape_string(trim($_POST['coop_label'] ?? ''));
+        $acquired    = $conn->real_escape_string($_POST['date_acquired'] ?? '');
+        $replacement = $conn->real_escape_string($_POST['expected_replacement'] ?? '');
+        $notes       = $conn->real_escape_string(trim($_POST['notes'] ?? ''));
+        $repl_sql    = $replacement ? "'$replacement'" : 'NULL';
+        $coop_sql    = $coop_number > 0 ? $coop_number : 'NULL';
+        $label_sql   = $coop_label ? "'$coop_label'" : 'NULL';
+
+        if (empty($breed)) {
+            $message = "<div class='alert error'>Breed name is required.</div>";
+        } elseif ($coop_number < 1) {
+            $message = "<div class='alert error'>Coop number must be 1 or higher.</div>";
+        } else {
+            // Check duplicate coop only if coop_number changed
+            $coop_check = $conn->query("SELECT batch_id FROM batches WHERE coop_number=$coop_sql AND status='Active' AND batch_id != $id LIMIT 1");
+            if ($coop_check && $coop_check->num_rows > 0) {
+                $existing = $coop_check->fetch_assoc();
+                $message = "<div class='alert error'>Coop #$coop_number is already assigned to active Batch #{$existing['batch_id']}.</div>";
+            } else {
+                $upd = $conn->query("UPDATE batches SET breed='$breed', coop_number=$coop_sql, coop_label=$label_sql,
+                                     initial_count=$quantity, date_acquired='$acquired',
+                                     expected_replacement=$repl_sql, notes='$notes'
+                                     WHERE batch_id=$id");
+                if (!$upd) {
+                    // Fallback for alternate column name
+                    $conn->query("UPDATE batches SET breed='$breed', coop_number=$coop_sql, coop_label=$label_sql,
+                                  quantity=$quantity, date_acquired='$acquired',
+                                  expected_replacement=$repl_sql, notes='$notes'
+                                  WHERE batch_id=$id");
+                }
+                $message = "<div class='alert success'>Batch #$id updated successfully.</div>";
+            }
+        }
+
     } elseif ($action === 'retire') {
         $id = intval($_POST['batch_id']);
         $conn->query("UPDATE batches SET status='Retired' WHERE batch_id=$id");
@@ -230,6 +269,20 @@ $total   = $batches ? $batches->num_rows : 0;
                             <?php echo htmlspecialchars($row['notes'] ?: '—'); ?>
                         </td>
                         <td style="text-align:center; white-space:nowrap;">
+                            <!-- Edit button (always visible) -->
+                            <button type="button" class="icon-btn icon-btn--blue" title="Edit batch"
+                                onclick="openEditModal(<?php echo htmlspecialchars(json_encode([
+                                    'batch_id'             => $row['batch_id'],
+                                    'breed'                => $row['breed'],
+                                    'quantity'             => $bird_count,
+                                    'coop_number'          => $coop_num,
+                                    'coop_label'           => $coop_lbl,
+                                    'date_acquired'        => $acq_date,
+                                    'expected_replacement' => $repl_date,
+                                    'notes'                => $row['notes'] ?? '',
+                                ]), ENT_QUOTES); ?>)">
+                                <span class="material-symbols-outlined">edit</span>
+                            </button>
                             <?php if ($row['status'] === 'Active'): ?>
                                 <form method="POST" style="display:inline;"
                                       onsubmit="return confirm('Retire Batch #<?php echo $row['batch_id']; ?>?')">
@@ -272,6 +325,56 @@ $total   = $batches ? $batches->num_rows : 0;
     <a href="../dashboard.php" class="back-link">&larr; Back to Dashboard</a>
 </div>
 
+<!-- EDIT BATCH MODAL -->
+<div id="edit-modal-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:1000; align-items:center; justify-content:center;">
+    <div class="card edit-modal">
+        <div class="edit-modal__header">
+            <h4 class="form-card__title" style="margin:0;">Edit Batch <span id="edit-modal-id"></span></h4>
+            <button type="button" class="icon-btn icon-btn--ghost" onclick="closeEditModal()" title="Close">
+                <span class="material-symbols-outlined">close</span>
+            </button>
+        </div>
+        <form method="POST" id="edit-form">
+            <input type="hidden" name="action"   value="edit">
+            <input type="hidden" name="batch_id" id="edit_batch_id">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Breed / Variety <span class="required">*</span></label>
+                    <input type="text" name="breed" id="edit_breed" class="form-input" required>
+                </div>
+                <div class="form-group">
+                    <label>Number of Birds <span class="required">*</span></label>
+                    <input type="number" name="quantity" id="edit_quantity" class="form-input" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Coop Number <span class="required">*</span></label>
+                    <input type="number" name="coop_number" id="edit_coop_number" class="form-input" min="1" required>
+                </div>
+                <div class="form-group">
+                    <label>Coop Label <span class="label-hint">(optional)</span></label>
+                    <input type="text" name="coop_label" id="edit_coop_label" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Date Acquired</label>
+                    <input type="date" name="date_acquired" id="edit_date_acquired" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label>Expected Replacement</label>
+                    <input type="date" name="expected_replacement" id="edit_expected_replacement" class="form-input">
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:14px;">
+                <label>Notes</label>
+                <input type="text" name="notes" id="edit_notes" class="form-input">
+            </div>
+            <div class="form-actions" style="margin-top:18px;">
+                <button type="submit" class="btn-farm btn-green">Save Changes</button>
+                <button type="button" class="btn-farm btn-dark" onclick="closeEditModal()">Cancel</button>
+            </div>
+        </form>
+    </div>
+</div>
+
 <style>
 .page-container   { max-width:1040px; margin:2rem auto; }
 .form-card        { border:1px solid var(--border-mid); border-top:3px solid var(--success);
@@ -298,6 +401,18 @@ $total   = $batches ? $batches->num_rows : 0;
 .icon-btn--danger { background:rgba(194,58,58,0.1); color:var(--danger); }
 .icon-btn--danger:hover { background:rgba(194,58,58,0.22); }
 
+.icon-btn--blue   { background:rgba(59,130,246,0.12); color:#3b82f6; }
+.icon-btn--blue:hover { background:rgba(59,130,246,0.25); }
+.icon-btn--ghost  { background:transparent; color:var(--text-muted); }
+.icon-btn--ghost:hover { background:rgba(0,0,0,0.08); }
+
+.edit-modal       { padding:1.6rem 1.8rem; width:100%; max-width:640px; border-top:3px solid #3b82f6;
+                    max-height:90vh; overflow-y:auto; }
+.edit-modal__header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; }
+
+#edit-modal-overlay { display:none; }
+#edit-modal-overlay.open { display:flex !important; }
+
 .empty-icon  { width:36px; height:36px; color:var(--text-muted); margin:0 auto 10px; display:block; }
 </style>
 
@@ -309,6 +424,35 @@ function toggleAddPanel() {
         panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
+
+function openEditModal(data) {
+    document.getElementById('edit_batch_id').value           = data.batch_id;
+    document.getElementById('edit-modal-id').textContent     = '#' + data.batch_id;
+    document.getElementById('edit_breed').value              = data.breed          || '';
+    document.getElementById('edit_quantity').value           = data.quantity       || '';
+    document.getElementById('edit_coop_number').value        = data.coop_number    || '';
+    document.getElementById('edit_coop_label').value         = data.coop_label     || '';
+    document.getElementById('edit_date_acquired').value      = data.date_acquired  ? data.date_acquired.substring(0,10) : '';
+    document.getElementById('edit_expected_replacement').value = data.expected_replacement ? data.expected_replacement.substring(0,10) : '';
+    document.getElementById('edit_notes').value              = data.notes          || '';
+    document.getElementById('edit-modal-overlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeEditModal() {
+    document.getElementById('edit-modal-overlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+// Close on overlay click
+document.getElementById('edit-modal-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeEditModal();
+});
+
+// Close on Escape key
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeEditModal();
+});
 </script>
 
 <?php include('../../includes/footer.php'); ?>

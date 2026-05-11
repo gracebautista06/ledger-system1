@@ -172,7 +172,7 @@ $s_stmt->close();
                                         <button type="submit" class="btn-farm btn-dark btn-sm"
                                                 title="Withdraw request"
                                                 style="font-size:0.72rem; padding:3px 8px; opacity:0.8;">
-                                            ✕ Withdraw
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Withdraw
                                         </button>
                                     </form>
                                 </div>
@@ -255,7 +255,7 @@ $s_stmt->close();
                                         <button type="submit" class="btn-farm btn-dark btn-sm"
                                                 title="Withdraw request"
                                                 style="font-size:0.72rem; padding:3px 8px; opacity:0.8;">
-                                            ✕ Withdraw
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Withdraw
                                         </button>
                                     </form>
                                 </div>
@@ -323,7 +323,7 @@ $s_stmt->close();
                                         <button type="submit" class="btn-farm btn-dark btn-sm"
                                                 title="Withdraw request"
                                                 style="font-size:0.72rem; padding:3px 8px; opacity:0.8;">
-                                            ✕ Withdraw
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:4px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Withdraw
                                         </button>
                                     </form>
                                 </div>

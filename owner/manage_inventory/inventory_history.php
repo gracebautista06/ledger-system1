@@ -154,7 +154,7 @@ $filter_params = ['status' => $filter_status, 'breed' => $filter_breed, 'from' =
                 </select>
             </div>
             <div class="filter-actions">
-                <button type="submit" class="btn-farm btn-sm">Filter</button>
+                <button type="submit" class="btn-farm btn-sm">🔍</button>
                 <a href="inventory_history.php" class="btn-farm btn-dark btn-sm">Reset</a>
             </div>
         </form>

@@ -66,6 +66,90 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'Sale'    => ['table' => 'sales',        'pk' => 'sale_id'],
                 ];
 
+                // ── Inventory safety check: block Harvest deletion if it would
+                //    make sold eggs exceed remaining harvested eggs for that batch ──
+                if ($record_type === 'Harvest') {
+                    // Get the batch_id and egg counts of the harvest being deleted
+                    $hq = $conn->prepare("
+                        SELECT batch_id,
+                               COALESCE(size_pw,0) AS pw, COALESCE(size_s,0)  AS s,
+                               COALESCE(size_m,0)  AS m,  COALESCE(size_l,0)  AS l,
+                               COALESCE(size_xl,0) AS xl, COALESCE(size_j,0)  AS j
+                        FROM harvests WHERE harvest_id = ? LIMIT 1
+                    ");
+                    $hq->bind_param('i', $record_id);
+                    $hq->execute();
+                    $harvest_row = $hq->get_result()->fetch_assoc();
+                    $hq->close();
+
+                    if ($harvest_row) {
+                        $batch_id = (int)$harvest_row['batch_id'];
+                        $size_keys = ['pw','s','m','l','xl','j'];
+
+                        // Total harvested per size for the whole batch (excluding this record)
+                        $remaining_harvest_q = $conn->prepare("
+                            SELECT COALESCE(SUM(size_pw),0) AS pw, COALESCE(SUM(size_s),0)  AS s,
+                                   COALESCE(SUM(size_m),0)  AS m,  COALESCE(SUM(size_l),0)  AS l,
+                                   COALESCE(SUM(size_xl),0) AS xl, COALESCE(SUM(size_j),0)  AS j
+                            FROM harvests WHERE batch_id = ? AND harvest_id != ?
+                        ");
+                        $remaining_harvest_q->bind_param('ii', $batch_id, $record_id);
+                        $remaining_harvest_q->execute();
+                        $remaining_harvest = $remaining_harvest_q->get_result()->fetch_assoc();
+                        $remaining_harvest_q->close();
+
+                        // Total sold per size for this batch
+                        $has_batch_col = $conn->query("SHOW COLUMNS FROM sales LIKE 'batch_id'")->num_rows > 0;
+                        if ($has_batch_col) {
+                            $sq = $conn->prepare("
+                                SELECT COALESCE(SUM(qty_pw),0) AS pw, COALESCE(SUM(qty_s),0)  AS s,
+                                       COALESCE(SUM(qty_m),0)  AS m,  COALESCE(SUM(qty_l),0)  AS l,
+                                       COALESCE(SUM(qty_xl),0) AS xl, COALESCE(SUM(qty_j),0)  AS j
+                                FROM sales WHERE batch_id = ?
+                            ");
+                            $sq->bind_param('i', $batch_id);
+                        } else {
+                            $arr_q   = $conn->prepare("SELECT COALESCE(date_acquired, '2000-01-01') AS arr FROM batches WHERE batch_id = ?");
+                            $arr_q->bind_param('i', $batch_id);
+                            $arr_q->execute();
+                            $arr_date = $arr_q->get_result()->fetch_assoc()['arr'] ?? '2000-01-01';
+                            $arr_q->close();
+                            $arr_esc  = $conn->real_escape_string($arr_date);
+                            $sq = $conn->prepare("
+                                SELECT COALESCE(SUM(qty_pw),0) AS pw, COALESCE(SUM(qty_s),0)  AS s,
+                                       COALESCE(SUM(qty_m),0)  AS m,  COALESCE(SUM(qty_l),0)  AS l,
+                                       COALESCE(SUM(qty_xl),0) AS xl, COALESCE(SUM(qty_j),0)  AS j
+                                FROM sales WHERE DATE(date_sold) >= '$arr_esc'
+                            ");
+                        }
+                        $sq->execute();
+                        $sold_trays = $sq->get_result()->fetch_assoc();
+                        $sq->close();
+
+                        // Check each size: remaining harvest (trays) must >= sold (trays)
+                        $conflicts = [];
+                        $size_labels = ['pw'=>'Peewee','s'=>'Small','m'=>'Medium','l'=>'Large','xl'=>'XL','j'=>'Jumbo'];
+                        foreach ($size_keys as $sz) {
+                            $harv_after_delete = (int)($remaining_harvest[$sz] ?? 0);
+                            $sold_qty          = (int)($sold_trays[$sz] ?? 0); // trays
+                            $harv_trays        = (int)floor($harv_after_delete / 30);
+                            if ($sold_qty > $harv_trays) {
+                                $conflicts[] = "{$size_labels[$sz]}: {$sold_qty} tray(s) sold but only {$harv_trays} tray(s) would remain";
+                            }
+                        }
+
+                        if (!empty($conflicts)) {
+                            $flash = "<div class='alert error'>"
+                                   . "<strong>Cannot delete this harvest — it would make inventory go negative:</strong><br>"
+                                   . implode('<br>', $conflicts)
+                                   . "<br><small>Reject this request or delete the conflicting sales first.</small>"
+                                   . "</div>";
+                            // Skip the delete entirely — fall through to render the page with the error
+                            goto render_page;
+                        }
+                    }
+                }
+
                 $delete_ok = false;
 
                 if (isset($table_map[$record_type])) {
@@ -160,6 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+render_page:
 $reqs_q = $conn->query("
     SELECT er.*, u.username AS staff_name
     FROM edit_requests er

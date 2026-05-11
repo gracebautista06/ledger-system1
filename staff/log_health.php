@@ -33,7 +33,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $check->close();
 
     if (!$valid_batch) {
-        $message = "<div class='alert error'>⚠️ Please select a valid active batch.</div>";
+        $warn_icon = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-3px;margin-right:6px;flex-shrink:0;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>';
+        $message = "<div class='alert error'>{$warn_icon}Please select a valid active batch.</div>";
     } else {
         $ins = $conn->prepare("INSERT INTO flock_health (staff_id, batch_id, status_level, mortality_count, symptoms) VALUES (?,?,?,?,?)");
         $ins->bind_param("iisis", $staff_id, $batch_id, $status_level, $mortality_count, $symptoms);
@@ -77,11 +78,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         <div class="form-group">
             <label>Overall Health Status</label>
-            <select name="status_level" class="form-input" required>
-                <option value="Healthy">🟢 Healthy — Normal behavior, no issues</option>
-                <option value="Warning">🟡 Warning — Minor concerns observed</option>
-                <option value="Critical">🔴 Critical — High mortality or disease signs</option>
+            <select name="status_level" id="status_level" class="form-input" required onchange="updateStatusBadge(this.value)">
+                <option value="Healthy">Healthy — Normal behavior, no issues</option>
+                <option value="Warning">Warning — Minor concerns observed</option>
+                <option value="Critical">Critical — High mortality or disease signs</option>
             </select>
+            <div id="status_badge" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:0.8rem;font-weight:600;">
+                <span id="status_dot" style="width:10px;height:10px;border-radius:50%;background:#2f9e44;display:inline-block;flex-shrink:0;"></span>
+                <span id="status_text" style="color:#2f9e44;">Healthy</span>
+            </div>
         </div>
 
         <div class="form-group">
@@ -105,6 +110,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </div>
 
 <script>
+const STATUS_COLORS = { Healthy: '#2f9e44', Warning: '#f08c00', Critical: '#e03131' };
+
+function updateStatusBadge(val) {
+    const color = STATUS_COLORS[val] || '#2f9e44';
+    document.getElementById('status_dot').style.background = color;
+    document.getElementById('status_text').style.color     = color;
+    document.getElementById('status_text').textContent     = val;
+}
+
 let isDirty = false;
 const healthForm = document.getElementById('healthForm');
 healthForm.addEventListener('input', () => isDirty = true);

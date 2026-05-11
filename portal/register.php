@@ -25,7 +25,7 @@ if (isset($_SESSION['role'])) {
 
 // IMPROVEMENT: Define secret keys in one place.
 // In production, move these to a config.php outside the web root.
-define('KEY_OWNER', 'FARM_BOSS_99');
+define('KEY_OWNER', 'FARM_BOSS');
 
 $errors  = [];
 $success = "";
