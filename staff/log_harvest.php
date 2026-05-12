@@ -67,7 +67,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 ?>
 
-<div class="card" style="max-width:650px; margin:2rem auto; border-top:5px solid var(--gold);">
+<div class="card" style="max-width:1100px; margin:2rem auto; border-top:5px solid var(--gold);">
 
     <h2 style="color:var(--gold); font-family:'Playfair Display',serif;">Daily Harvest Log</h2>
     <p style="color:var(--text-muted); margin-bottom:2rem;">Log counts per egg size.</p>
@@ -75,75 +75,84 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <?php echo $message; ?>
 
     <form method="POST" id="harvestForm">
-        <div class="form-group">
-            <label for="batch_id">Select Flock Batch</label>
-            <select name="batch_id" id="batch_id" class="form-input" required>
-                <option value="" disabled selected>-- Select Active Batch --</option>
-                <?php
-                if ($batch_query && $batch_query->num_rows > 0) {
-                    while ($b = $batch_query->fetch_assoc()) {
-                        // FIX #6: escape breed (varchar) to prevent XSS
-                        echo "<option value='" . (int)$b['batch_id'] . "'>"
-                           . "Batch #" . (int)$b['batch_id']
-                           . " (" . htmlspecialchars($b['breed'], ENT_QUOTES, 'UTF-8') . ")"
-                           . "</option>";
-                    }
-                } else {
-                    echo "<option disabled>No active batches</option>";
-                }
-                ?>
-            </select>
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; min-width:900px;">
+                <thead>
+                    <tr style="background:var(--bg-wood); border-bottom:2px solid var(--border-mid);">
+                        <th style="padding:10px 12px; text-align:left; font-size:0.72rem; font-weight:700;
+                                   color:var(--gold-muted); text-transform:uppercase; letter-spacing:0.7px;
+                                   white-space:nowrap; min-width:160px;">
+                            Flock Batch
+                        </th>
+                        <?php
+                        $sizes = ['size_pw'=>'Peewee (PW)','size_s'=>'Small (S)','size_m'=>'Medium (M)','size_l'=>'Large (L)','size_xl'=>'XLarge (XL)','size_j'=>'Jumbo (J)'];
+                        foreach ($sizes as $name => $label): ?>
+                        <th style="padding:10px 12px; text-align:center; font-size:0.72rem; font-weight:700;
+                                   color:var(--gold-muted); text-transform:uppercase; letter-spacing:0.7px;
+                                   white-space:nowrap;">
+                            <?php echo $label; ?>
+                        </th>
+                        <?php endforeach; ?>
+                        <th style="padding:10px 12px; text-align:left; font-size:0.72rem; font-weight:700;
+                                   color:var(--text-muted); text-transform:uppercase; letter-spacing:0.7px;
+                                   min-width:160px;">
+                            Notes
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background:var(--bg-plank);">
+                        <td style="padding:12px;">
+                            <select name="batch_id" id="batch_id" class="form-input" required
+                                    style="min-width:140px; font-size:0.88rem;">
+                                <option value="" disabled selected>-- Select --</option>
+                                <?php
+                                if ($batch_query && $batch_query->num_rows > 0) {
+                                    while ($b = $batch_query->fetch_assoc()) {
+                                        echo "<option value='" . (int)$b['batch_id'] . "'>"
+                                           . "Batch #" . (int)$b['batch_id']
+                                           . " (" . htmlspecialchars($b['breed'], ENT_QUOTES, 'UTF-8') . ")"
+                                           . "</option>";
+                                    }
+                                } else {
+                                    echo "<option disabled>No active batches</option>";
+                                }
+                                ?>
+                            </select>
+                        </td>
+                        <?php foreach ($sizes as $name => $label): ?>
+                        <td style="padding:12px 8px; text-align:center;">
+                            <input type="number" name="<?php echo $name; ?>"
+                                   class="form-input egg-count"
+                                   value="" placeholder="0"
+                                   min="0" max="9999"
+                                   style="text-align:center; padding:10px 6px; font-size:1rem;
+                                          font-weight:600; min-width:70px;">
+                        </td>
+                        <?php endforeach; ?>
+                        <td style="padding:12px;">
+                            <textarea name="notes" id="notes" class="form-input" rows="2"
+                                      placeholder="Cracked eggs, observations, issues…"
+                                      style="min-width:150px; font-size:0.88rem;"></textarea>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
-        <!-- Size Breakdown -->
-        <div style="background:var(--bg-wood); padding:18px; border-radius:var(--radius); border:1px solid var(--border-mid); margin-bottom:18px;">
-            <p style="font-weight:700; margin-bottom:14px; color:var(--gold-muted); font-size:0.78rem; text-transform:uppercase; letter-spacing:1px;">
-                Egg Size Breakdown
-            </p>
-            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;">
-                <?php
-                $sizes = ['size_pw'=>'Peewee (PW)','size_s'=>'Small (S)','size_m'=>'Medium (M)','size_l'=>'Large (L)','size_xl'=>'XLarge (XL)','size_j'=>'Jumbo (J)'];
-                foreach ($sizes as $name => $label): ?>
-                <div class="form-group" style="margin-bottom:0;">
-                    <label><?php echo $label; ?></label>
-                    <!-- FIX #10: blank placeholder so staff types rather than clears;
-                         FIX #11: max="9999" to cap fat-finger input -->
-                    <input type="number" name="<?php echo $name; ?>"
-                           class="form-input egg-count"
-                           value="" placeholder="0"
-                           min="0" max="9999">
-                </div>
-                <?php endforeach; ?>
-            </div>
+        <div style="margin-top:1.4rem;">
+            <button type="submit" id="submitBtn" class="btn-farm btn-full" style="padding:16px; font-size:1rem;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg><span id="submitLabel">Submit Harvest</span>
+            </button>
         </div>
 
-        <!-- Live Total -->
-      
-
-        <div class="form-group">
-            <label for="notes">Notes</label>
-            <textarea name="notes" id="notes" class="form-input" rows="2" placeholder="Cracked eggs, observations, issues…"></textarea>
-        </div>
-
-        <button type="submit" id="submitBtn" class="btn-farm btn-full" style="padding:16px; font-size:1rem;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg><span id="submitLabel">Submit Harvest</span>
-        </button>
-
-       
     </form>
 </div>
 
 <script>
 const sizeInputs   = document.querySelectorAll('.egg-count');
-const totalDisplay = document.getElementById('total_display');
 const harvestForm  = document.getElementById('harvestForm');
 let isDirty = false;
-
-function calculateTotal() {
-    let total = 0;
-    sizeInputs.forEach(i => total += Math.max(0, parseInt(i.value) || 0));
-    totalDisplay.textContent = total.toLocaleString();
-}
 
 harvestForm.addEventListener('input', () => isDirty = true);
 
@@ -161,6 +170,4 @@ window.addEventListener('beforeunload', e => { if (isDirty) { e.preventDefault()
 document.getElementById('backBtn').addEventListener('click', e => {
     if (isDirty && !confirm("You have unsaved data. Leave anyway?")) e.preventDefault();
 });
-sizeInputs.forEach(i => i.addEventListener('input', calculateTotal));
-calculateTotal();
 </script>

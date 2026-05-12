@@ -53,56 +53,88 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 ?>
 
-<div class="card" style="max-width:600px; margin:2rem auto; border-top:5px solid var(--terra-lt);">
+<div class="card" style="max-width:1100px; margin:2rem auto; border-top:5px solid var(--terra-lt);">
     <h2 style="color:var(--gold); font-family:'Playfair Display',serif;">Flock Health Report</h2>
     <p style="color:var(--text-muted); margin-bottom:2rem;">Report bird deaths, illness signs, or general observations.</p>
 
     <?php echo $message; ?>
 
     <form method="POST" id="healthForm">
-        <div class="form-group">
-            <label>Select Flock Batch</label>
-            <select name="batch_id" class="form-input" required>
-                <option value="" disabled selected>-- Select Active Batch --</option>
-                <?php
-                if ($batch_query && $batch_query->num_rows > 0) {
-                    while ($b = $batch_query->fetch_assoc()) {
-                        echo "<option value='{$b['batch_id']}'>Batch #{$b['batch_id']} ({$b['breed']})</option>";
-                    }
-                } else {
-                    echo "<option disabled>No active batches</option>";
-                }
-                ?>
-            </select>
+        <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; min-width:750px;">
+                <thead>
+                    <tr style="background:var(--bg-wood); border-bottom:2px solid var(--border-mid);">
+                        <th style="padding:10px 12px; text-align:left; font-size:0.72rem; font-weight:700;
+                                   color:var(--gold-muted); text-transform:uppercase; letter-spacing:0.7px;
+                                   white-space:nowrap; min-width:160px;">
+                            Flock Batch
+                        </th>
+                        <th style="padding:10px 12px; text-align:left; font-size:0.72rem; font-weight:700;
+                                   color:var(--gold-muted); text-transform:uppercase; letter-spacing:0.7px;
+                                   white-space:nowrap; min-width:200px;">
+                            Health Status
+                        </th>
+                        <th style="padding:10px 12px; text-align:center; font-size:0.72rem; font-weight:700;
+                                   color:var(--gold-muted); text-transform:uppercase; letter-spacing:0.7px;
+                                   white-space:nowrap; min-width:120px;">
+                            Mortality Count
+                        </th>
+                        <th style="padding:10px 12px; text-align:left; font-size:0.72rem; font-weight:700;
+                                   color:var(--gold-muted); text-transform:uppercase; letter-spacing:0.7px;
+                                   min-width:200px;">
+                            Observations / Symptoms
+                        </th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr style="background:var(--bg-plank);">
+                        <td style="padding:12px; vertical-align:top;">
+                            <select name="batch_id" class="form-input" required style="min-width:140px; font-size:0.88rem;">
+                                <option value="" disabled selected>-- Select --</option>
+                                <?php
+                                if ($batch_query && $batch_query->num_rows > 0) {
+                                    while ($b = $batch_query->fetch_assoc()) {
+                                        echo "<option value='{$b['batch_id']}'>Batch #{$b['batch_id']} ({$b['breed']})</option>";
+                                    }
+                                } else {
+                                    echo "<option disabled>No active batches</option>";
+                                }
+                                ?>
+                            </select>
+                        </td>
+                        <td style="padding:12px; vertical-align:top;">
+                            <select name="status_level" id="status_level" class="form-input" required
+                                    onchange="updateStatusBadge(this.value)"
+                                    style="font-size:0.88rem; min-width:180px;">
+                                <option value="Healthy">Healthy — Normal behavior</option>
+                                <option value="Warning">Warning — Minor concerns</option>
+                                <option value="Critical">Critical — High mortality/disease</option>
+                            </select>
+                            <div id="status_badge" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:0.8rem;font-weight:600;">
+                                <span id="status_dot" style="width:10px;height:10px;border-radius:50%;background:#2f9e44;display:inline-block;flex-shrink:0;"></span>
+                                <span id="status_text" style="color:#2f9e44;">Healthy</span>
+                            </div>
+                        </td>
+                        <td style="padding:12px; text-align:center; vertical-align:top;">
+                            <input type="number" name="mortality_count" class="form-input"
+                                   value="0" min="0" required
+                                   style="text-align:center; font-size:1rem; font-weight:600; min-width:80px;">
+                        </td>
+                        <td style="padding:12px; vertical-align:top;">
+                            <textarea name="symptoms" class="form-input" rows="3"
+                                      placeholder="e.g., Birds sluggish, reduced feed intake…"
+                                      style="min-width:180px; font-size:0.88rem;"></textarea>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
         </div>
 
-        <div class="form-group">
-            <label>Overall Health Status</label>
-            <select name="status_level" id="status_level" class="form-input" required onchange="updateStatusBadge(this.value)">
-                <option value="Healthy">Healthy — Normal behavior, no issues</option>
-                <option value="Warning">Warning — Minor concerns observed</option>
-                <option value="Critical">Critical — High mortality or disease signs</option>
-            </select>
-            <div id="status_badge" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:0.8rem;font-weight:600;">
-                <span id="status_dot" style="width:10px;height:10px;border-radius:50%;background:#2f9e44;display:inline-block;flex-shrink:0;"></span>
-                <span id="status_text" style="color:#2f9e44;">Healthy</span>
-            </div>
+        <div style="margin-top:1.4rem;">
+            <button type="submit" class="btn-farm btn-orange btn-full" style="padding:16px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Submit Health Report
+            </button>
         </div>
-
-        <div class="form-group">
-            <label>Mortality Count (Birds Found Dead Today)</label>
-            <input type="number" name="mortality_count" class="form-input" value="0" min="0" required>
-        </div>
-
-        <div class="form-group">
-            <label>Observations / Symptoms</label>
-            <textarea name="symptoms" class="form-input" rows="4"
-                      placeholder="e.g., Birds sluggish, reduced feed intake — or — All birds active and eating normally."></textarea>
-        </div>
-
-        <button type="submit" class="btn-farm btn-orange btn-full" style="padding:16px;">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Submit Health Report
-        </button>
 
     </form>
 </div>

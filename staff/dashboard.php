@@ -28,6 +28,18 @@ $stmt->bind_param('i', $staff_id); $stmt->execute();
 $my_pending = (int)$stmt->get_result()->fetch_assoc()['total'];
 $stmt->close();
 
+// ── STAT: Reviewed requests (Approved/Rejected) with owner notes ──
+$stmt = $conn->prepare("
+    SELECT request_type, record_type, status, owner_note, reviewed_at
+    FROM edit_requests
+    WHERE staff_id = ? AND status IN ('Approved','Rejected') AND reviewed_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+    ORDER BY reviewed_at DESC
+    LIMIT 5
+");
+$stmt->bind_param('i', $staff_id); $stmt->execute();
+$reviewed_requests = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$stmt->close();
+
 // ── STAT: Today's sales ────────────────────────────────────────
 $stmt = $conn->prepare("SELECT COALESCE(SUM(quantity_sold),0) AS sold_today, COALESCE(SUM(total_amount),0) AS revenue_today FROM sales WHERE staff_id=? AND DATE(date_sold)=CURDATE()");
 $stmt->bind_param('i', $staff_id); $stmt->execute();
@@ -276,6 +288,46 @@ $health_q = $conn->query("
             <div style="display:flex; gap:10px; align-items:flex-start;">
                 <i class="fa-solid fa-triangle-exclamation" style="color:var(--warning); margin-top:2px;"></i>
                 <span style="font-size:0.83rem; color:var(--warning);">You have <strong><?= $my_pending ?> pending edit request<?= $my_pending > 1 ? 's' : '' ?></strong> — check your logs.</span>
+            </div>
+            <?php endif; ?>
+
+            <?php if (!empty($reviewed_requests)): ?>
+            <div style="border-top:1px solid var(--border-subtle); margin-top:10px; padding-top:10px;">
+                <div style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:0.7px;
+                            color:var(--text-muted); margin-bottom:8px;">
+                    <i class="fa-solid fa-envelope-open-text" style="color:var(--gold); margin-right:5px;"></i>
+                    Owner Responses (Last 7 Days)
+                </div>
+                <?php foreach ($reviewed_requests as $rr):
+                    $is_approved = $rr['status'] === 'Approved';
+                    $icon_color  = $is_approved ? 'var(--success)' : '#e03131';
+                    $icon_class  = $is_approved ? 'fa-circle-check' : 'fa-circle-xmark';
+                    $badge_bg    = $is_approved ? 'rgba(78,155,91,0.12)' : 'rgba(224,49,49,0.10)';
+                    $badge_color = $is_approved ? 'var(--success)' : '#e03131';
+                    $label       = ucfirst(strtolower($rr['request_type'] ?? 'Edit')) . ' request';
+                    $record      = htmlspecialchars(ucfirst(str_replace('_',' ', $rr['record_type'] ?? '')));
+                    $note        = htmlspecialchars($rr['owner_note'] ?? '');
+                    $date        = date('M d, g:i a', strtotime($rr['reviewed_at']));
+                ?>
+                <div style="display:flex; gap:10px; align-items:flex-start; padding:8px 10px;
+                            background:<?= $badge_bg ?>; border-radius:6px; margin-bottom:6px;
+                            border-left:3px solid <?= $badge_color ?>;">
+                    <i class="fa-solid <?= $icon_class ?>" style="color:<?= $icon_color ?>; margin-top:2px; flex-shrink:0;"></i>
+                    <div style="flex:1; min-width:0;">
+                        <div style="font-size:0.8rem; font-weight:600; color:var(--text-primary);">
+                            <?= $rr['status'] ?> — <?= $label ?> <span style="color:var(--text-muted); font-weight:400;">(<?= $record ?>)</span>
+                        </div>
+                        <?php if (!empty($note)): ?>
+                        <div style="font-size:0.78rem; color:var(--text-secondary); margin-top:3px; font-style:italic;">
+                            "<?= $note ?>"
+                        </div>
+                        <?php else: ?>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">No note left by owner.</div>
+                        <?php endif; ?>
+                        <div style="font-size:0.7rem; color:var(--text-muted); margin-top:3px;"><?= $date ?></div>
+                    </div>
+                </div>
+                <?php endforeach; ?>
             </div>
             <?php endif; ?>
         </div>
