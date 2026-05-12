@@ -99,7 +99,7 @@ if ($is_owner && isset($conn) && isset($_SESSION['user_id'])) {
                 </a>
                 <?php endif; ?>
                 <span class="topbar-date">
-                    <?php echo date('M j, Y'); ?>
+                    <?php echo date('l, M j, Y'); ?>
                 </span>
             </div>
         </header>

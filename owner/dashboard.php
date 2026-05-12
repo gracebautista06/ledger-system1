@@ -91,11 +91,7 @@ $js_rev_data = json_encode($rev_data);
         <h2><i class="fa-solid fa-gauge" style="color:var(--gold); margin-right:8px;"></i>Management Dashboard</h2>
         <p>Welcome back, <strong style="color:var(--gold);"><?php echo htmlspecialchars($_SESSION['username']); ?></strong> — here's your farm today.</p>
     </div>
-    <div style="display:flex; align-items:center; gap:14px;">
-        <span style="font-size:0.82rem; color:var(--text-muted); font-weight:600;">
-            <?php echo date('l, F j, Y'); ?>
-        </span>
-    </div>
+
 </div>
 
 <!-- ── STAT CARDS ─────────────────────────────────────────── -->

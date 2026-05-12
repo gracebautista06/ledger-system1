@@ -254,8 +254,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
 <script>
 function togglePassword() {
-    const input = document.getElementById("inputId");
-    const icon = document.getElementById("iconId");
+    const input = document.getElementById(inputId);
+    const icon = document.getElementById(iconId);
 
     if (!input || !icon) return;
 
