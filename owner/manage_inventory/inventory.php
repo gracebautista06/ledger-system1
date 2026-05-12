@@ -336,10 +336,7 @@ $old_stock_batches = array_filter($batches_list, function($bl) {
         </div>
         <span class="timestamp"><?php echo date('M d, Y — g:i A'); ?></span>
 
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <a href="inventory_history.php" class="btn-farm btn-dark btn-sm">View History &amp; Reports &rarr;</a>
-            <a href="../dashboard.php" class="back-link" style="margin:0;">&larr; Dashboard</a>
-        </div>
+       
     </div>
 
     <?php echo $message; ?>

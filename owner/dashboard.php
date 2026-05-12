@@ -88,7 +88,7 @@ $js_rev_data = json_encode($rev_data);
 <!-- ── PAGE HEADER ────────────────────────────────────────── -->
 <div class="page-header">
     <div>
-        <h2>📊 Management Dashboard</h2>
+        <h2><i class="fa-solid fa-gauge" style="color:var(--gold); margin-right:8px;"></i>Management Dashboard</h2>
         <p>Welcome back, <strong style="color:var(--gold);"><?php echo htmlspecialchars($_SESSION['username']); ?></strong> — here's your farm today.</p>
     </div>
     <div style="display:flex; align-items:center; gap:14px;">
@@ -242,83 +242,6 @@ $js_rev_data = json_encode($rev_data);
         </div>
         <?php endif; ?>
     </div>
-
-    <!-- ── QUICK ACTIONS — grouped by subfolder ────────────── -->
-    <div>
-
-        <!--  INVENTORY -->
-        <div style="font-size:0.68rem; font-weight:700; color:var(--text-muted);
-                    text-transform:uppercase; letter-spacing:1px; margin-bottom:7px;">
-            Inventory
-        </div>
-        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
-            <a href="manage_inventory/inventory.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-                Active Stock
-            </a>
-            <a href="manage_inventory/inventory_history.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-                Inventory History
-            </a>
-        </div>
-
-        <!--  FLOCKS -->
-        <div style="font-size:0.68rem; font-weight:700; color:var(--text-muted);
-                    text-transform:uppercase; letter-spacing:1px; margin-bottom:7px;">
-             Flocks
-        </div>
-        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
-            <a href="manage_flocks/batches.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-                Active Batches
-            </a>
-            <a href="manage_flocks/flock_history.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-                Flock History
-            </a>
-        </div>
-
-        <!--  SALES -->
-        <div style="font-size:0.68rem; font-weight:700; color:var(--text-muted);
-                    text-transform:uppercase; letter-spacing:1px; margin-bottom:7px;">
-             Sales
-        </div>
-        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
-            <a href="manage_sales/view_sales.php"
-               class="btn-farm btn-orange" style="text-align:center; font-size:0.85rem; padding:9px;">
-                Today's Sales
-            </a>
-             <a href="manage_sales/prices.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-                Egg Pricing
-            </a>
-            <a href="manage_sales/sales_history.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-                Sales History
-            </a>
-        </div>
-
-        <!--  USERS -->
-        <div style="font-size:0.68rem; font-weight:700; color:var(--text-muted);
-                    text-transform:uppercase; letter-spacing:1px; margin-bottom:7px;">
-             Users
-        </div>
-        <div style="display:flex; flex-direction:column; gap:6px;">
-            <a href="manage_inventory/data_management.php"
-               class="btn-farm btn-purple" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-                Data Management
-            </a>
-            <a href="manage_users/users.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px;">
-                Staff Management
-            </a>
-            <a href="reports.php"
-               class="btn-farm btn-dark" style="text-align:center; font-size:0.85rem; padding:9px; opacity:0.8;">
-               Generate Report
-            </a>
-        </div>
-
-    </div><!-- end quick actions -->
 
 </div>
 
