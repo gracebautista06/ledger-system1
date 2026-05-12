@@ -479,5 +479,3 @@ updateUI(); // init on load
 recalcSaleTotal(); // init total on load
 <?php endif; ?>
 </script>
-
-<?php include('../includes/footer.php'); ?>

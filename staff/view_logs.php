@@ -129,7 +129,7 @@ $s_stmt->close();
         <div>
             <h2>Your Recent Activity</h2>
         </div>
-        <a href="dashboard.php" class="back-link" style="margin:0;">← Back to Menu</a>
+    
     </div>
 
     <?php echo $flash; ?>
@@ -352,4 +352,3 @@ $s_stmt->close();
 
 <script>/* modals removed — edit/delete go directly to their pages */</script>
 
-<?php include('../includes/footer.php'); ?>

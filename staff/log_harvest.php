@@ -111,19 +111,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     <input type="number" name="<?php echo $name; ?>"
                            class="form-input egg-count"
                            value="" placeholder="0"
-                           min="0" max="9999" required>
+                           min="0" max="9999">
                 </div>
                 <?php endforeach; ?>
             </div>
         </div>
 
         <!-- Live Total -->
-        <div class="form-group" style="background:var(--bg-plank); padding:16px; border-radius:var(--radius); text-align:center; margin-bottom:1.5rem; border:1px solid var(--border-mid);">
-            <label style="color:var(--text-muted); display:block; margin-bottom:6px; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.8px;">
-                Total Eggs Harvested
-            </label>
-            <div id="total_display" style="font-size:2.8rem; font-weight:800; color:var(--gold); font-family:'Playfair Display',serif; line-height:1;">0</div>
-        </div>
+      
 
         <div class="form-group">
             <label for="notes">Notes</label>
@@ -134,9 +129,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg><span id="submitLabel">Submit Harvest</span>
         </button>
 
-        <a href="dashboard.php" id="backBtn" class="back-link" style="display:block; text-align:center; margin-top:1rem;">
-            ← Back to Dashboard
-        </a>
+       
     </form>
 </div>
 
@@ -171,5 +164,3 @@ document.getElementById('backBtn').addEventListener('click', e => {
 sizeInputs.forEach(i => i.addEventListener('input', calculateTotal));
 calculateTotal();
 </script>
-
-<?php include('../includes/footer.php'); ?>

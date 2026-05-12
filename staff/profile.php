@@ -558,10 +558,6 @@ $stmt->close();
 
     </div><!-- /.profile-grid -->
 
-    <a href="dashboard.php" class="back-link" style="margin-top:1.6rem; display:inline-block;">
-        &larr; Back to Dashboard
-    </a>
-
 </div>
 
 <script>
@@ -628,5 +624,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
-
-<?php include('../includes/footer.php'); ?>

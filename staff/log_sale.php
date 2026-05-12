@@ -359,7 +359,6 @@ if ($selected_batch) {
         <div style="font-size:0.88rem; color:var(--text-secondary); line-height:1.6; margin-bottom:16px;">
             No active batches found. Please ask the Owner to add a batch before recording a sale.
         </div>
-        <a href="dashboard.php" class="btn-farm btn-dark">← Back to Dashboard</a>
     </div>
 
     <?php else: ?>
@@ -579,10 +578,7 @@ if ($selected_batch) {
                 style="padding:15px; font-size:1rem;">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg><span id="submitLabel">Record Sale</span>
         </button>
-        <a href="dashboard.php" id="backBtn" class="back-link"
-           style="display:block; text-align:center; margin-top:1rem;">
-            ← Back to Dashboard
-        </a>
+
     </form>
     <?php endif; ?>
 </div>
@@ -747,5 +743,3 @@ onBatchChange(<?php echo json_encode((string)$selected_batch_id); ?>);
 <?php endif; ?>
 recalc();
 </script>
-
-<?php include('../includes/footer.php'); ?>

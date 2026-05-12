@@ -136,7 +136,7 @@ $health_q = $conn->query("
 <div class="db-header">
     <div>
         <h1 class="db-header__greeting"><?= htmlspecialchars($greeting) ?>, <?= htmlspecialchars($username) ?></h1>
-        <p class="db-header__sub"><?= date('l, F j, Y') ?></p>
+      
     </div>
 </div>
 
@@ -145,7 +145,7 @@ $health_q = $conn->query("
 <div class="alert--warning">
     <i class="fa-solid fa-triangle-exclamation"></i>
     <?= $my_pending ?> pending edit <?= $my_pending === 1 ? 'request' : 'requests' ?> awaiting review.
-    <a href="view_logs.php">View Logs →</a>
+    <a href="view_logs.php">View Logs</a>
 </div>
 <?php endif; ?>
 
@@ -315,5 +315,3 @@ new Chart(document.getElementById('harvestChart').getContext('2d'), {
     }
 });
 </script>
-
-<?php include('../includes/footer.php'); ?>

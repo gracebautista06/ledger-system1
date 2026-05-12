@@ -103,9 +103,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <button type="submit" class="btn-farm btn-orange btn-full" style="padding:16px;">
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:6px;"><polyline points="20 6 9 17 4 12"/></svg>Submit Health Report
         </button>
-        <a href="dashboard.php" id="backBtn" class="back-link" style="display:block; text-align:center; margin-top:1rem;">
-            ← Back to Dashboard
-        </a>
+
     </form>
 </div>
 
@@ -128,5 +126,3 @@ document.getElementById('backBtn').addEventListener('click', e => {
     if (isDirty && !confirm("Discard unsaved health report?")) e.preventDefault();
 });
 </script>
-
-<?php include('../includes/footer.php'); ?>
