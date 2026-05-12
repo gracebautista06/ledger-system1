@@ -462,5 +462,3 @@ function fetch_record_snapshot(mysqli $conn, string $type, int $id): ?array
     <?php endforeach; endif; ?>
 
 </div>
-
-<?php include('../includes/footer.php'); ?>

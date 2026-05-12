@@ -98,12 +98,9 @@ $payment_config = [
     <div class="page-header">
         <div>
             <h2>Today's Sales</h2>
-            <p><?php echo $today_fmt; ?></p>
+            
         </div>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <a href="sales_history.php" class="btn-farm btn-dark btn-sm">Full History &amp; Reports &rarr;</a>
-            <a href="../dashboard.php" class="back-link" style="margin:0;">&larr; Dashboard</a>
-        </div>
+        
     </div>
 
     <!-- SNAPSHOT CARDS -->
@@ -161,9 +158,7 @@ $payment_config = [
             <path d="M6 15h4M14 15h4"/>
         </svg>
         <h3 class="empty-title">No sales recorded today.</h3>
-        <p class="empty-sub">
-            Once staff log sales for <?php echo date('F j'); ?>, they'll appear here instantly.
-        </p>
+      
     </div>
 
     <?php else: ?>
@@ -325,12 +320,6 @@ $payment_config = [
 
     <?php endif; ?>
 
-    <div class="page-footer-nav">
-        <a href="../dashboard.php" class="back-link">&larr; Back to Dashboard</a>
-        <a href="sales_history.php" class="link-gold text-sm">
-            Full history &amp; export &rarr;
-        </a>
-    </div>
 
 </div>
 
@@ -397,5 +386,3 @@ $payment_config = [
 .page-footer-nav { margin-top:1.5rem; display:flex; justify-content:space-between;
                    align-items:center; flex-wrap:wrap; gap:10px; }
 </style>
-
-<?php include('../../includes/footer.php'); ?>

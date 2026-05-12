@@ -89,14 +89,7 @@ function pagination_url(int $p, string $from, string $to, string $method): strin
             <h2>Sales History</h2>
             <p>Filter by date range and payment method.</p>
         </div>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <a href="export_sales.php?from=<?php echo urlencode($date_from); ?>&to=<?php echo urlencode($date_to); ?>&method=<?php echo urlencode($filter_method); ?>&format=excel"
-               class="btn-farm btn-green btn-sm">Export Excel</a>
-            <a href="export_sales.php?from=<?php echo urlencode($date_from); ?>&to=<?php echo urlencode($date_to); ?>&method=<?php echo urlencode($filter_method); ?>&format=pdf"
-               class="btn-farm btn-danger btn-sm">Export PDF</a>
-             <a href="view_sales.php" class="btn-farm btn-dark btn-sm">Sales Records</a>
-            <a href="../dashboard.php" class="back-link" style="margin:0;">← Dashboard</a>
-        </div>
+      
     </div>
 
     <div class="card" style="margin-bottom:1.5rem; padding:1.4rem 1.8rem;">
@@ -255,8 +248,6 @@ function pagination_url(int $p, string $from, string $to, string $method): strin
         <?php endif; ?>
     </div>
 
-    <a href="../dashboard.php" class="back-link">← Back to Dashboard</a>
         
 </div>
 
-<?php include('../../includes/footer.php'); ?>

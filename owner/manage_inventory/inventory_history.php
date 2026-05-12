@@ -132,10 +132,7 @@ $filter_params = ['status' => $filter_status, 'breed' => $filter_breed, 'from' =
             <h2>Inventory History</h2>
             <p>Archive of all retired batches — full production and revenue records.</p>
         </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-            <a href="inventory.php" class="btn-farm btn-dark btn-sm">Active Inventory</a>
-            <a href="../dashboard.php" class="back-link" style="margin:0;">&larr; Dashboard</a>
-        </div>
+      
     </div>
 
     <!-- FILTER PANEL -->
@@ -297,11 +294,7 @@ $filter_params = ['status' => $filter_status, 'breed' => $filter_breed, 'from' =
                             <path d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8"/>
                         </svg>
                         <p>No retired batches in the archive yet.</p>
-                        <small>
-                            When a batch is marked as Retired in
-                            <a href="../../manage_flocks/batches.php" class="link-gold">Manage Flocks</a>,
-                            it will appear here with its full production history.
-                        </small>
+                      
                     </div>
                 </td></tr>
                 <?php endif; ?>
@@ -336,12 +329,11 @@ $filter_params = ['status' => $filter_status, 'breed' => $filter_breed, 'from' =
     <!-- INFO NOTE -->
     <div class="info-note">
         <strong>Data flow:</strong>
-        Active batches live in <strong>inventory.php</strong>.
-        Once a batch is <strong>Retired</strong> in Manage Flocks,
+        Active batches live in <strong>inventory</strong>.
+        Once a batch is <strong>Retired</strong>,
         it moves here permanently with its full production and sales record — your permanent audit trail.
     </div>
 
-    <a href="../dashboard.php" class="back-link">&larr; Back to Dashboard</a>
 </div>
 
 <style>
@@ -380,5 +372,3 @@ $filter_params = ['status' => $filter_status, 'breed' => $filter_breed, 'from' =
 
 .empty-icon { width:36px; height:36px; color:var(--text-muted); margin:0 auto 10px; display:block; }
 </style>
-
-<?php include('../../includes/footer.php'); ?>

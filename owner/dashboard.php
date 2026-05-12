@@ -278,5 +278,3 @@ new Chart(document.getElementById('revenueChart').getContext('2d'), {
                  x:{grid:{display:false},ticks:{color:cd.tc}} } }
 });
 </script>
-
-<?php include('../includes/footer.php'); ?>

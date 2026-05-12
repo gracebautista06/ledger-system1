@@ -290,7 +290,6 @@ function format_last_seen(?string $last_seen, int $is_online): string
         </div>
     </div>
 
-    <a href="../dashboard.php" class="back-link">← Back to Dashboard</a>
 </div>
 
 <script>
@@ -337,5 +336,3 @@ function refreshOnlineStatus() {
 }
 setInterval(refreshOnlineStatus, 30000);
 </script>
-
-<?php include('../../includes/footer.php'); ?>

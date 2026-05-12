@@ -184,10 +184,6 @@ if ($audit_q) while ($row = $audit_q->fetch_assoc()) $audit_log[] = $row;
             <h2>Data Management</h2>
             <p>Delete records and manage batches. All actions are logged.</p>
         </div>
-        <a href="../dashboard.php" class="btn-farm btn-dark btn-icon" style="padding:9px 14px;font-size:0.8rem;">
-            <i data-lucide="arrow-left" style="width:14px;height:14px;"></i>
-            Back
-        </a>
     </div>
 
     <?php echo $message; ?>
@@ -502,5 +498,3 @@ function closeAllModals() {
     document.querySelectorAll('.dm-modal').forEach(m => m.style.display = 'none');
 }
 </script>
-
-<?php include('../../includes/footer.php'); ?>

@@ -148,16 +148,31 @@ $filter_params = ['status'=>$filter_status, 'breed'=>$filter_breed, 'q'=>$search
 $size_labels = ['size_pw'=>'PW', 'size_s'=>'S', 'size_m'=>'M', 'size_l'=>'L', 'size_xl'=>'XL', 'size_j'=>'J'];
 ?>
 
-<div style="max-width:1080px; margin:2rem auto;">
+<style>
+/* ── Compact table overrides for flock history ──────────── */
+.flock-history-wrap { max-width:100%; margin:1.5rem 0; }
+@media (min-width:1200px) { .flock-history-wrap { max-width:1120px; margin:1.5rem auto; } }
+
+.flock-history-wrap .table-farm { font-size:0.78rem; }
+.flock-history-wrap .table-farm thead th { padding:7px 9px; font-size:0.64rem; }
+.flock-history-wrap .table-farm tbody td { padding:7px 9px; }
+
+/* Truncate wide text columns */
+.flock-history-wrap .table-farm .col-notes {
+    max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.flock-history-wrap .table-farm .col-sizes {
+    max-width:130px; white-space:normal; line-height:1.5;
+}
+.flock-history-wrap .table-farm .col-period { min-width:90px; }
+</style>
+
+<div class="flock-history-wrap">
 
     <div class="page-header">
         <div>
             <h2>   Flock History</h2>
             <p>Lifetime archive of all flock batches — production records &amp; lifecycle data.</p>
-        </div>
-        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-            <a href="batches.php"        class="btn-farm btn-dark btn-sm"> Active Batches</a>
-            <a href="../dashboard.php"   class="back-link" style="margin:0;">← Dashboard</a>
         </div>
     </div>
 
@@ -316,7 +331,7 @@ $size_labels = ['size_pw'=>'PW', 'size_s'=>'S', 'size_m'=>'M', 'size_l'=>'L', 's
                             <span style="color:var(--text-muted);">—</span>
                         <?php endif; ?>
                     </td>
-                    <td style="font-size:0.78rem; color:var(--text-muted);">
+                    <td class="col-period" style="font-size:0.78rem; color:var(--text-muted);">
                         <?php if ($first_h): ?>
                             <div><?php echo date('M d, Y', strtotime($first_h)); ?></div>
                             <?php if ($last_h && $first_h !== $last_h): ?>
@@ -350,12 +365,12 @@ $size_labels = ['size_pw'=>'PW', 'size_s'=>'S', 'size_m'=>'M', 'size_l'=>'L', 's
                             <span style="color:var(--text-muted);">—</span>
                         <?php endif; ?>
                     </td>
-                    <td style="font-family:monospace; font-size:0.72rem; color:var(--text-muted); white-space:nowrap; line-height:1.9;">
+                    <td class="col-sizes" style="font-family:monospace; font-size:0.72rem; color:var(--text-muted); line-height:1.9;">
                         <?php echo !empty($size_parts)
                             ? implode(' &nbsp;', $size_parts)
                             : '<span style="color:var(--text-muted)">—</span>'; ?>
                     </td>
-                    <td style="font-size:0.8rem; color:var(--text-muted); max-width:140px;">
+                    <td class="col-notes" style="font-size:0.8rem; color:var(--text-muted);">
                         <?php echo htmlspecialchars($row['notes'] ?: '—'); ?>
                     </td>
                 </tr>
@@ -363,11 +378,11 @@ $size_labels = ['size_pw'=>'PW', 'size_s'=>'S', 'size_m'=>'M', 'size_l'=>'L', 's
                 else: ?>
                 <tr><td colspan="11">
                     <div class="empty-state">
-                        <span class="empty-icon">🐔</span>
+                        <span class="empty-icon"></span>
                         <p>No flock records found.</p>
                         <small>
                             Retire a batch in
-                            <a href="batches.php" style="color:var(--gold);">Manage Batches</a>
+                            <a href="batches.php" style="color:var(--gold);">Active Batches</a>
                             and it will appear here as a permanent record.
                         </small>
                     </div>
@@ -406,13 +421,10 @@ $size_labels = ['size_pw'=>'PW', 'size_s'=>'S', 'size_m'=>'M', 'size_l'=>'L', 's
                 font-size:0.82rem; color:#6AABDE; border-left:4px solid var(--info);
                 margin-top:1.4rem;">
         💡 <strong>How data flows:</strong>
-        Batches are managed in <strong>batches.php</strong> (Active layer).
+        Batches are managed in <strong>batches</strong> (Active layer).
         Once a batch is <strong>Retired</strong>, it stays visible here forever
         with its full production record — harvest sessions, egg counts, size breakdowns.
         This is your permanent flock performance log.
     </div>
 
-    <a href="../dashboard.php" class="back-link">← Back to Dashboard</a>
 </div>
-
-<?php include('../../includes/footer.php'); ?>

@@ -628,5 +628,4 @@ function format_field_value(string $field_key, string $value): string {
     <?php endforeach; endif; ?>
 
 </div>
-
-<?php include('../includes/footer.php'); ?>         
+        

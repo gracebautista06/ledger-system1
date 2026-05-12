@@ -167,7 +167,7 @@ $size_meta = [
             <span class="empty-icon"></span>
             <p>No breeds found.</p>
             <small>Add a flock batch first in
-                <a href="batches.php" style="color:var(--gold);">Manage Batches</a>.
+                <a href="../manage_flocks/batches.php" style="color:var(--gold);">Active Batches</a>.
                
             </small>
         </div>
@@ -331,8 +331,7 @@ $size_meta = [
         <input type="hidden" name="hide_breed" value="<?php echo htmlspecialchars($breed_b64); ?>">
     </form>
     <?php endforeach; ?>
-                           
-    <a href="../dashboard.php" class="back-link">← Back to Dashboard</a>
+
 </div>
 
 <script>
@@ -361,5 +360,3 @@ function updatePiece(breedB64, code) {
     pieceEl.textContent = tray > 0 ? '≈ ₱' + (tray / 30).toFixed(4) : '—';
 }
 </script>
-
-<?php include('../../includes/footer.php'); ?>

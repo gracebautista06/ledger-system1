@@ -636,9 +636,6 @@ $total_pending  = (int)$conn->query("SELECT COUNT(*) AS c FROM edit_requests WHE
 
     </div><!-- /.profile-grid -->
 
-    <a href="dashboard.php" class="back-link" style="margin-top:1.6rem; display:inline-block;">
-        ← Back to Dashboard
-    </a>
 
 </div>
 
@@ -718,5 +715,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 </script>
-
-<?php include('../includes/footer.php'); ?>

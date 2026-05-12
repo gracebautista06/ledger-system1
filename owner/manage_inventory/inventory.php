@@ -334,7 +334,7 @@ $old_stock_batches = array_filter($batches_list, function($bl) {
             <h2>Egg Inventory</h2>
             <p>Stock on hand &middot; Per-size counts</p>
         </div>
-        <span class="timestamp"><?php echo date('M d, Y — g:i A'); ?></span>
+        
 
        
     </div>
@@ -779,7 +779,7 @@ $old_stock_batches = array_filter($batches_list, function($bl) {
                 <path d="M16 7V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"/>
             </svg>
             <p>No active batches found.</p>
-            <small>Add batches in <a href="../manage_batches.php" class="link-gold">Manage Batches</a> first.</small>
+            <small>Add batches in <a href="../manage_flocks/batches.php" class="link-gold">Manage Batches</a> first.</small>
         </div>
         <?php endif; ?>
     </div>
@@ -799,7 +799,6 @@ $old_stock_batches = array_filter($batches_list, function($bl) {
     </div>
     <?php endif; ?>
 
-    <a href="../dashboard.php" class="back-link">&larr; Back to Dashboard</a>
 </div>
 
 
@@ -922,5 +921,3 @@ new Chart(document.getElementById('stockDist').getContext('2d'), {
 });
 <?php endif; ?>
 </script>
-
-<?php include('../../includes/footer.php'); ?>

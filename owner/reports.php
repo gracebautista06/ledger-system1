@@ -695,7 +695,6 @@ $type_icons = [
     </div>
     <?php endif; ?>
 
-    <a href="dashboard.php" class="back-link no-print">← Back to Dashboard</a>
 </div>
 
 <script>
@@ -752,6 +751,3 @@ function resetReport(e) {
     window.location.href = 'reports.php?type=' + type;
 }
 </script>
-
-
-<?php include('../includes/footer.php'); ?>

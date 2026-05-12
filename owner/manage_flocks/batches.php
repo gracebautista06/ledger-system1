@@ -245,7 +245,7 @@ $total   = $batches ? $batches->num_rows : 0;
                         <td class="text-muted text-sm">
                             <?php echo $acq_date ? date('M d, Y', strtotime($acq_date)) : '—'; ?>
                         </td>
-                        <td class="text-sm">
+                        <td class="text-sm repl-cell">
                             <?php if ($repl_date): ?>
                                 <div style="color:<?php echo ($days_left !== null && $days_left <= 30) ? 'var(--danger)' : 'var(--text-secondary)'; ?>; font-weight:600;">
                                     <?php echo date('M d, Y', strtotime($repl_date)); ?>
@@ -265,7 +265,7 @@ $total   = $batches ? $batches->num_rows : 0;
                                 <span class="text-muted">—</span>
                             <?php endif; ?>
                         </td>
-                        <td class="text-muted text-sm" style="max-width:160px;">
+                        <td class="text-muted text-sm notes-cell">
                             <?php echo htmlspecialchars($row['notes'] ?: '—'); ?>
                         </td>
                         <td style="text-align:center; white-space:nowrap;">
@@ -322,7 +322,6 @@ $total   = $batches ? $batches->num_rows : 0;
         </div>
     </div>
 
-    <a href="../dashboard.php" class="back-link">&larr; Back to Dashboard</a>
 </div>
 
 <!-- EDIT BATCH MODAL -->
@@ -414,6 +413,25 @@ $total   = $batches ? $batches->num_rows : 0;
 #edit-modal-overlay.open { display:flex !important; }
 
 .empty-icon  { width:36px; height:36px; color:var(--text-muted); margin:0 auto 10px; display:block; }
+
+/* ── Compact table overrides for batches page ───────────── */
+.page-container .table-farm { font-size:0.8rem; }
+.page-container .table-farm thead th { padding:8px 10px; font-size:0.66rem; }
+.page-container .table-farm tbody td { padding:8px 10px; }
+.page-container .card[style*="overflow:hidden"] { overflow:hidden; }
+.page-container .table-wrapper { overflow-x:auto; }
+
+/* Notes column: truncate long text */
+.page-container .table-farm td.notes-cell {
+    max-width:120px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap;
+}
+/* Replacement Due column: tighter */
+.page-container .table-farm td.repl-cell { min-width:100px; }
+
+/* Page container fills available width, no forced max cap that causes scroll */
+.page-container { max-width:100%; margin:1.5rem 0; }
+@media (min-width:1200px) { .page-container { max-width:1080px; margin:1.5rem auto; } }
 </style>
 
 <script>
@@ -454,5 +472,3 @@ document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeEditModal();
 });
 </script>
-
-<?php include('../../includes/footer.php'); ?>

@@ -56,7 +56,6 @@ function sidebar_link($href, $label, $icon_class, $current_page, $match_file) {
         <div class="sidebar-section-label">Management</div>
         <?php sidebar_link('/ledger-system1/owner/manage_users/users.php',               'Staff Management', 'fa-solid fa-users',    $current_page, 'users.php'); ?>
         <?php sidebar_link('/ledger-system1/owner/manage_inventory/data_management.php', 'Data Management',  'fa-solid fa-database', $current_page, 'data_management.php'); ?>
-        <?php sidebar_link('/ledger-system1/owner/manage_users/activity_log.php',                     'Activity Log',     'fa-solid fa-timeline', $current_page, 'activity_log.php'); ?>
         <?php sidebar_link('/ledger-system1/owner/staff_notifications.php',              'Staff Requests',   'fa-solid fa-bell',     $current_page, 'staff_notifications.php'); ?>
 
         <div class="sidebar-section-label">Account</div>

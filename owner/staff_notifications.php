@@ -154,9 +154,7 @@ $default_config = [
                 </button>
             </form>
             <?php endif; ?>
-            <a href="dashboard.php" class="back-link">
-                <i class="fa-solid fa-arrow-left"></i> Dashboard
-            </a>
+        
         </div>
     </div>
 
@@ -288,5 +286,3 @@ $default_config = [
     <?php endforeach; endif; ?>
 
 </div>
-
-<?php include('../includes/footer.php'); ?>
