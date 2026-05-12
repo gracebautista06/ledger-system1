@@ -1,16 +1,5 @@
 <?php
-/* ============================================================
-   portal/register.php — New User Registration
-   IMPROVEMENTS:
-   - Uses prepared statements (fixes SQL injection risk)
-   - Server-side role validation (whitelist)
-   - Username + password strength validation
-   - Password confirmation field added
-   - Password strength meter (JS)
-   - Secret keys externalized to a constant block with note
-     to move to .env in production
-   - Redirect to login on success
-   ============================================================ */
+
 
 $page_title = 'Register';
 
@@ -23,8 +12,7 @@ if (isset($_SESSION['role'])) {
     exit();
 }
 
-// IMPROVEMENT: Define secret keys in one place.
-// In production, move these to a config.php outside the web root.
+// Define secret keys
 define('KEY_OWNER', 'FARM_BOSS');
 
 $errors  = [];

@@ -13,6 +13,12 @@ function sidebar_link($href, $label, $icon_class, $current_page, $match_file) {
 
 <aside class="sidebar" id="sidebar">
 
+    <!-- Brand -->
+    <div class="sidebar-brand">
+        <span class="sidebar-brand-icon">🥚</span>
+        <span class="sidebar-brand-name">Egg Ledger</span>
+    </div>
+
     <!-- Profile Section -->
     <div class="sidebar-profile">
         <div class="sidebar-avatar">

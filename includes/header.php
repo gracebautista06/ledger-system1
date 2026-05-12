@@ -1,3 +1,15 @@
+<?php
+
+ob_start();
+// ── Must run before ANY HTML output ───────────────────────
+$levels = max(0, substr_count($_SERVER['PHP_SELF'], '/') - 2);
+$root   = str_repeat('../', $levels);
+if (session_status() === PHP_SESSION_NONE) session_start();
+
+if (isset($_SESSION['user_id']) && isset($conn)) {
+    include_once $root . 'includes/update_last_seen.php';
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -6,16 +18,6 @@
     <title><?php echo isset($page_title) ? htmlspecialchars($page_title) . ' — ' : ''; ?>Egg Ledger System</title>
     <meta name="description" content="Egg Ledger — Digital farm management for harvest tracking, flock health, and sales.">
     <meta name="robots" content="noindex, nofollow">
-
-    <?php
-        $levels = max(0, substr_count($_SERVER['PHP_SELF'], '/') - 2);
-        $root   = str_repeat('../', $levels);
-        if (session_status() === PHP_SESSION_NONE) session_start();
-
-        if (isset($_SESSION['user_id']) && isset($conn)) {
-            include_once $root . 'includes/update_last_seen.php';
-        }
-    ?>
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
