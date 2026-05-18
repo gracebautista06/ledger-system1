@@ -13,6 +13,7 @@ include('../includes/log_activity.php');
 $username = $_SESSION['username'];
 $staff_id = (int) $_SESSION['user_id'];
 
+date_default_timezone_set('Asia/Manila');
 $hour     = (int) date('H');
 $greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
 

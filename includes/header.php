@@ -99,8 +99,10 @@ if ($is_owner && isset($conn) && isset($_SESSION['user_id'])) {
                 </a>
                 <?php endif; ?>
                 <span class="topbar-date">
-                    <?php echo date('l, M j, Y — g:i A'); ?>
-                    
+                    <?php
+                        date_default_timezone_set('Asia/Manila');
+                        echo date('l, M j, Y — g:i A');
+                    ?>
                 </span>
             </div>
         </header>

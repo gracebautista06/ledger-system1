@@ -16,23 +16,6 @@
     
     src="<?php echo $root; ?>assets/js/script.js">
     
-    document.addEventListener("DOMContentLoaded", function () {
-
-    const sidebar = document.querySelector(".sidebar");
-
-    // Restore scroll position
-    const savedScroll = sessionStorage.getItem("sidebarScroll");
-
-    if (savedScroll !== null) {
-        sidebar.scrollTop = savedScroll;
-    }
-
-    // Save scroll position before leaving page
-    sidebar.addEventListener("scroll", function () {
-        sessionStorage.setItem("sidebarScroll", sidebar.scrollTop);
-    });
-
-});
 
     </script>
 </body>
