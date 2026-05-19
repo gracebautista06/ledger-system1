@@ -15,7 +15,7 @@ $staff_id = (int) $_SESSION['user_id'];
 
 date_default_timezone_set('Asia/Manila');
 $hour     = (int) date('H');
-$greeting = $hour < 12 ? 'Good morning' : ($hour < 17 ? 'Good afternoon' : 'Good evening');
+$greeting = $hour < 12 ? 'Good morning' : ($hour < 18 ? 'Good afternoon' : 'Good evening');
 
 // ── STAT: Today's harvest ──────────────────────────────────────
 $stmt = $conn->prepare("SELECT COALESCE(SUM(total_eggs),0) AS logged_today FROM harvests WHERE staff_id=? AND DATE(date_logged)=CURDATE()");
