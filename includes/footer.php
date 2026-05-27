@@ -12,11 +12,40 @@
         </div>
     </footer>
 
-    <script 
-    
-    src="<?php echo $root; ?>assets/js/script.js">
-    
+    <script>
+    (function () {
+        var toggle  = document.getElementById('sidebarToggle');
+        var sidebar = document.getElementById('sidebar');
+        var overlay = document.getElementById('sidebarOverlay');
 
+        if (!toggle || !sidebar) return;
+
+        function openSidebar() {
+            sidebar.classList.add('open');
+            if (overlay) overlay.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        toggle.addEventListener('click', function () {
+            sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+        });
+
+        if (overlay) overlay.addEventListener('click', closeSidebar);
+
+        sidebar.querySelectorAll('.sidebar-link').forEach(function (link) {
+            link.addEventListener('click', function () {
+                if (window.innerWidth <= 768) closeSidebar();
+            });
+        });
+    })();
     </script>
+
+    <script src="<?php echo $root; ?>assets/js/script.js"></script>
 </body>
 </html>
